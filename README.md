@@ -2,7 +2,7 @@
 
 Author: Kpono Akpabio, assisted by Claude Code
 
-Live demo: https://kingkpono2.github.io/core-papers-explorer/
+Live demo: https://core-papers-explorer-5l1d.vercel.app
 
 A small Angular app for searching open-access research papers through the
 [CORE API v3](https://api.core.ac.uk/docs/v3). It lists matching papers, lets you choose how many
@@ -29,7 +29,7 @@ charts how all matching papers are distributed over time.
 - SCSS with CSS custom properties, no UI library
 - Karma + Jasmine for unit tests, running in headless Chrome
 - ESLint (angular-eslint, typescript-eslint) and Prettier
-- GitHub Actions for CI
+- GitHub Actions for CI, Vercel for hosting
 
 ## Prerequisites
 
@@ -44,7 +44,8 @@ npm install
 npm start
 ```
 
-Then open http://localhost:4200.
+Then open http://localhost:4200. The dev server proxies `/core-api` to the CORE API
+(`proxy.conf.json`), so no other setup is needed.
 
 ## Commands
 
@@ -77,8 +78,8 @@ npm run start:local
 ```
 
 `environment.local.ts` is gitignored, so the key never ends up in the repository. Note that any key
-used by a browser app is visible to its users; for a public deployment the key should sit behind a
-small server-side proxy instead.
+used by a browser app is visible to its users, even though requests go through the proxy described
+under [Deployment](#deployment); the deployed demo therefore runs without a key.
 
 When a key is set, an HTTP interceptor sends it as `Authorization: Bearer <key>`, and only on
 requests to the CORE API base URL.
@@ -90,6 +91,30 @@ Requests`, or a request fails with a 5xx or network error, the client retries up
 with exponential backoff (1 s, 2 s, 4 s), spending at most 10 seconds waiting. If the server says
 to wait longer than that, the app stops and shows a message instead. Each attempt times out after
 15 seconds. Using an API key raises the limit.
+
+## Deployment
+
+The live demo is hosted on [Vercel](https://vercel.com) and deploys automatically on every push to
+`main`; other branches get preview deployments.
+
+**Why a proxy is needed.** CORE's CORS policy only allows `http://localhost:*` and `core.ac.uk`
+origins, so a browser on any other site cannot read its responses. The app therefore never calls
+`api.core.ac.uk` directly. It calls the same-origin path `/core-api/v3/...`, and:
+
+- in development, the Angular dev server forwards `/core-api/*` to `https://api.core.ac.uk/*`
+  (`proxy.conf.json`, wired in `angular.json`);
+- in production, a Vercel rewrite in `vercel.json` does the same on Vercel's edge, server to server,
+  so CORS never applies.
+
+`vercel.json` also sets the build command and output directory, sends every other path without a
+file extension to `index.html` so deep links work, and adds `X-Content-Type-Options` and
+`Referrer-Policy` headers. Leave Vercel's `trailingSlash` option unset: CORE's search endpoint needs
+the trailing slash (`/v3/search/works/`), and `trailingSlash: false` would redirect it away.
+
+**Deploy your own copy.** Fork the repository, choose "Add New Project" in Vercel, import the fork
+and accept the detected settings; `vercel.json` supplies the rest. No environment variables are
+needed. Any static host works for the files in `dist/core-papers-explorer/browser`, as long as it
+can proxy `/core-api/*` to `https://api.core.ac.uk/*` and fall back to `index.html`.
 
 ## Project structure
 
@@ -111,6 +136,8 @@ src/
   testing/             test fixtures shared between specs
 docs/
   WALKTHROUGH.md       design decisions and notes, phase by phase
+proxy.conf.json        dev-server proxy for the CORE API
+vercel.json            Vercel build settings, API rewrite, SPA fallback and headers
 ```
 
 ## How I built this
