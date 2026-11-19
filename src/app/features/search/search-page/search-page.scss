@@ -56,9 +56,30 @@ button {
 
 .results {
   margin-top: var(--space-6);
-  padding: var(--space-8) var(--space-4);
-  text-align: center;
+}
+
+.status {
+  margin: 0 0 var(--space-4);
   color: var(--color-text-muted);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius);
+
+  &--error {
+    color: var(--color-danger);
+  }
+}
+
+.paper-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding-left: var(--space-6);
+
+  a {
+    font-weight: 600;
+  }
+}
+
+.meta {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
 }
