@@ -1,0 +1,7 @@
+<div class="error" [class.error--warning]="rateLimited()" role="alert">
+  <p class="heading">{{ rateLimited() ? 'Too many searches' : 'Search failed' }}</p>
+  <p class="message">{{ error().message }}</p>
+  @if (canRetry()) {
+    <button type="button" class="button button--secondary" (click)="retry.emit()">Retry</button>
+  }
+</div>

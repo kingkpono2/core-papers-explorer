@@ -1,0 +1,21 @@
+<div class="empty">
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </svg>
+  <p class="heading">{{ heading() }}</p>
+  <div class="message"><ng-content /></div>
+
+  @if (examples().length) {
+    <p class="examples-label" [id]="examplesLabelId">Try one of these:</p>
+    <ul class="examples" [attr.aria-labelledby]="examplesLabelId">
+      @for (example of examples(); track example) {
+        <li>
+          <button type="button" class="chip" (click)="exampleSelected.emit(example)">
+            {{ example }}
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</div>
