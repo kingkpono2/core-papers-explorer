@@ -2,6 +2,8 @@
 
 Author: Kpono Akpabio, assisted by Claude Code
 
+Live demo: https://kingkpono2.github.io/core-papers-explorer/
+
 A small Angular app for searching open-access research papers through the
 [CORE API v3](https://api.core.ac.uk/docs/v3). It lists matching papers, lets you choose how many
 are returned, supports boolean keyword queries such as `(drone AND (package OR delivery))`, and
