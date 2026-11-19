@@ -13,6 +13,8 @@ const NAMED_ENTITIES: Record<string, string> = {
 // Some providers send abstracts as escaped HTML, sometimes without the final semicolon.
 const ENTITY = /&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);?/gi;
 const TAG = /<\/?[a-z][^<>]*>/gi;
+// Truncated abstracts can end in half a tag, such as `</p` or `<jats:p`, with no closing `>`.
+const TRAILING_TAG_FRAGMENT = /<\/?[a-z][\w:.-]*\s*$/i;
 const LANDING_LINK_TYPES = ['display', 'reader'];
 
 export function toSearchResult(response: CoreSearchResponse): SearchResult {
@@ -58,6 +60,7 @@ export function cleanText(value: string | null | undefined): string | null {
   const text = value
     .replace(ENTITY, (_, entity: string) => decodeEntity(entity))
     .replace(TAG, ' ')
+    .replace(TRAILING_TAG_FRAGMENT, '')
     .replace(/\s+/g, ' ')
     .trim();
   return text || null;

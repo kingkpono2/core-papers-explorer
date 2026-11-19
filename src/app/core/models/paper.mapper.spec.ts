@@ -88,8 +88,19 @@ describe('paper mapper', () => {
       ).toBe('Line one. Line two.');
     });
 
+    it('removes a stray unclosed tag fragment at the end of the abstract', () => {
+      expect(toPaper(work({ abstract: '&lt;p&gt;First release.&lt;/p' })).abstract).toBe(
+        'First release.',
+      );
+      expect(toPaper(work({ abstract: '<jats:p>Line one.</jats:p> <jats:p' })).abstract).toBe(
+        'Line one.',
+      );
+      expect(cleanText('Text.</p  \n')).toBe('Text.');
+    });
+
     it('keeps comparison operators that are not tags', () => {
       expect(cleanText('p &lt; 0.05 and q &gt; 1')).toBe('p < 0.05 and q > 1');
+      expect(cleanText('true when a < b')).toBe('true when a < b');
     });
 
     it('removes duplicate and blank authors, ignoring case', () => {
