@@ -1,0 +1,15 @@
+<section class="panel" aria-labelledby="search-heading">
+  <h1 id="search-heading">Search research papers</h1>
+  <form class="search-form" role="search" (submit)="$event.preventDefault()">
+    <label for="query">Keywords</label>
+    <div class="search-form__row">
+      <input id="query" type="search" name="query" [placeholder]="exampleQuery" disabled />
+      <button type="submit" disabled>Search</button>
+    </div>
+    <p class="hint">Combine terms with AND, OR, NOT and parentheses.</p>
+  </form>
+</section>
+
+<section class="results" aria-label="Results">
+  <p>Results will appear here.</p>
+</section>
