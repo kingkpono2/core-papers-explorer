@@ -14,7 +14,7 @@ describe('apiKeyInterceptor', () => {
     const config: CoreApiConfig = {
       baseUrl,
       apiKey,
-      timeoutMs: 15_000,
+      timeoutMs: 30_000,
       retry: { maxRetries: 0, baseDelayMs: 0, maxTotalDelayMs: 0 },
     };
     TestBed.configureTestingModule({

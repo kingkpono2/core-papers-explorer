@@ -12,4 +12,11 @@ describe('CORE_API_CONFIG', () => {
 
     expect(config.baseUrl).toBe('/core-api/v3');
   });
+
+  it('gives each attempt 30 seconds and keeps retries bounded', () => {
+    const config = TestBed.inject(CORE_API_CONFIG);
+
+    expect(config.timeoutMs).toBe(30_000);
+    expect(config.retry).toEqual({ maxRetries: 3, baseDelayMs: 1_000, maxTotalDelayMs: 10_000 });
+  });
 });

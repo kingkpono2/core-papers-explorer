@@ -14,7 +14,8 @@ export const CORE_API_CONFIG = new InjectionToken<CoreApiConfig>('CORE_API_CONFI
   factory: () => ({
     baseUrl: environment.coreApiBaseUrl,
     apiKey: environment.coreApiKey,
-    timeoutMs: 15_000,
+    // Cold searches on CORE have taken up to 45 s; 30 s covers most of them without a frozen page.
+    timeoutMs: 30_000,
     retry: { maxRetries: 3, baseDelayMs: 1_000, maxTotalDelayMs: 10_000 },
   }),
 });

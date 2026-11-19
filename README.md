@@ -20,7 +20,7 @@ charts how all matching papers are distributed over time.
   error messages with a retry button (with specific wording when CORE rate-limits the app)
 - Responsive layout from phone to desktop, keyboard friendly, with screen reader announcements for
   result counts and focus moved to the results after each search
-- Retries with backoff on rate limits and transient failures, and a 15 second timeout per request
+- Retries with backoff on rate limits and transient failures, and a 30 second timeout per request
 
 ## Tech stack
 
@@ -90,7 +90,8 @@ Anonymous access allows about 10 requests per rate-limit window. When CORE answe
 Requests`, or a request fails with a 5xx or network error, the client retries up to three times
 with exponential backoff (1 s, 2 s, 4 s), spending at most 10 seconds waiting. If the server says
 to wait longer than that, the app stops and shows a message instead. Each attempt times out after
-15 seconds. Using an API key raises the limit.
+30 seconds, because cold searches on CORE can be slow; timeouts are not retried. Using an API key
+raises the limit.
 
 ## Deployment
 
