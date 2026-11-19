@@ -69,13 +69,27 @@ npm run start:local
 used by a browser app is visible to its users; for a public deployment the key should sit behind a
 small server-side proxy instead.
 
+When a key is set, an HTTP interceptor sends it as `Authorization: Bearer <key>`, and only on
+requests to the CORE API base URL.
+
+## Rate limits
+
+Anonymous access allows about 10 requests per rate-limit window. When CORE answers `429 Too Many
+Requests`, or a request fails with a 5xx or network error, the client retries up to three times
+with exponential backoff (1 s, 2 s, 4 s), spending at most 10 seconds waiting. If the server says
+to wait longer than that, the app stops and shows a message instead. Each attempt times out after
+15 seconds. Using an API key raises the limit.
+
 ## Project structure
 
 ```
 src/
   app/
-    core/              app-wide singletons: layout, and later API services, models, interceptors
+    core/              app-wide singletons
+      api/             CoreApiService, retry policy, error model, API config token
+      interceptors/    adds the optional API key to CORE requests
       layout/          site header and footer
+      models/          raw CORE API types, the app's Paper model and the mapper between them
     features/
       search/          the search page (lazy loaded)
     shared/
@@ -95,7 +109,7 @@ Design decisions are explained in [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md).
 ## Roadmap
 
 - [x] 1. Project setup: Angular 20, strict mode, lint, format, CI, app shell
-- [ ] 2. CORE API layer: typed models, service, timeouts, retry with backoff on 429, error handling
+- [x] 2. CORE API layer: typed models, service, timeouts, retry with backoff on 429, error handling
 - [ ] 3. Paper cards with loading, empty and error states; responsive and accessible
 - [ ] 4. Results-per-page control, pagination and state in the URL
 - [ ] 5. Boolean keyword search with validation, help and search history

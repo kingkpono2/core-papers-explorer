@@ -155,3 +155,161 @@ Checked from the server with curl before writing any API code (19 November 2026)
   `totalHits: 5626`. That allows a per-year chart built from counts across all matches, without
   downloading every paper. `limit=0` is ignored and falls back to 10 results, so count queries
   should use `limit=1`.
+
+## Phase 2: CORE API layer
+
+### What was built
+
+- `core/models/`: the raw response types (`CoreWork`, `CoreSearchResponse`), the app's own
+  `Paper` and `SearchResult` models, and a pure mapper (`toPaper`, `toSearchResult`) between them.
+- `core/api/CoreApiService`: one method, `searchWorks({ query, limit, offset })`, returning
+  `Observable<SearchResult>`. It adds a 15 second timeout, retries transient failures with backoff
+  and turns every failure into an `ApiError`.
+- `core/api/retry-transient.ts`: the retry policy as a small RxJS operator.
+- `core/api/api-error.ts`: `ApiError` with a `kind` (`rate-limit`, `network`, `timeout`,
+  `bad-query`, `server`) and a message that can be shown to users as is.
+- `core/api/core-api.config.ts`: an injection token holding the base URL, key, timeout and retry
+  settings. Its default comes from the environment file; tests provide their own.
+- `core/interceptors/api-key.interceptor.ts`: a functional interceptor that adds
+  `Authorization: Bearer <key>` when a key is configured, and only for CORE API URLs.
+- `app.config.ts`: `provideHttpClient(withFetch(), withInterceptors([apiKeyInterceptor]))`.
+- A temporary search form on the search page: a query field defaulting to `drone`, a Search button,
+  the total number of hits and a plain list of titles, years and authors. Phase 3 replaces the
+  list with proper paper cards.
+
+No new npm packages.
+
+### What I found while building it
+
+- `exclude=fullText` works on `/search/works/` and drops the full text from each result. The app
+  never shows it, and for some papers it is megabytes, so every search sends it.
+- Abstracts sometimes arrive as escaped HTML, for example `&lt;p&gt;This is the first
+release&lt;/p&gt`, note the missing final semicolon. Others contain JATS tags like `<jats:p>`.
+- CORE's CORS response only exposes `link` and `collection-length`. The `X-RateLimit-*` headers
+  are sent, but a browser cannot read them. The retry code still honours `X-RateLimit-Retry-After`
+  (and the standard `Retry-After`) when they are readable, which matters if the app is ever put
+  behind a proxy, but in the browser today the exponential backoff is what actually runs.
+- A malformed query such as `drone AND (` returns `200` with results rather than `400`, so query
+  validation has to happen on the client (phase 5). The service still maps `400`/`422` to
+  `bad-query` in case CORE changes this.
+
+### Why it is built this way
+
+**Raw model, app model and a mapper.** The raw types describe what CORE sends: nearly everything
+optional or nullable, numeric ids, nested `authors`, `journals` and `links`. The `Paper` model
+describes what the UI needs: a string id, a title that is never empty, authors as a clean
+`string[]`, explicit `null` for anything missing, a ready-made `doiUrl` and a `sourceUrl` that is
+always set. The mapper is the single place where CORE's quirks are handled: trimming, decoding
+entities and stripping tags, removing duplicate authors (case-insensitive), normalising DOIs given
+as URLs, rejecting non-http links, and picking a landing page (`display` link, then `reader`, then
+the DOI, then the CORE work page). Components never see raw API data, so a change in the API means
+changing one function and its tests. Because the mapper is pure, it is tested without TestBed.
+
+**Retry only on 429, 5xx and network errors.** Those are the failures where trying again can give
+a different answer. A `400` or `404` will fail the same way every time, so retrying only burns
+rate-limit tokens and makes the user wait longer for the same error. Timeouts are not retried
+either: CORE has already taken 15 seconds, and three more attempts could leave the user waiting
+a minute. Better to say so and let them retry or narrow the search.
+
+**Backoff.** Delays are 1 s, 2 s and 4 s, up to three retries. For a `429` the delay is the larger
+of the backoff and the server's `Retry-After`, so a reset time that is already in the past (clock
+skew, for example) still waits the normal backoff. The total wait per request is capped at 10 seconds; if the server asks for
+more, the request fails at once with a `rate-limit` error instead of keeping a spinner up for a
+minute. The waiting budget is kept per subscription (`defer`), so resubscribing starts clean. There
+is no jitter: jitter spreads out many clients hitting one server, while this rate limit applies to
+a single browser, so it would only make the tests less predictable.
+
+**Timeout.** HttpClient has no default timeout, and a hung request leaves the page stuck in
+"Searching". The RxJS `timeout` sits before the retry, so it applies per attempt, and when it fires
+it unsubscribes, which aborts the underlying fetch.
+
+**Error model.** Components get one error type with a `kind` they can switch on (phase 3 can
+show a retry button for `network` but not for `bad-query`) and a message ready to display. The
+original `HttpErrorResponse` is kept as `cause` for debugging. Mapping happens once in the
+service, so components never inspect HTTP status codes.
+
+**Interceptor.** Adding the key in the service would work, but the interceptor keeps auth out of
+the request code and covers any future CORE endpoint, such as the per-year counts in phase 6. It
+checks that the URL starts with the configured base URL plus `/`, so the key only goes to CORE: not
+to other hosts, not to look-alike hosts such as `https://api.core.ac.uk.example.com/`, and not to
+paths that merely share the prefix.
+
+**`withFetch()`.** This switches HttpClient from XMLHttpRequest to the Fetch API. Angular recommends
+it for server-side rendering, so it keeps that option open, and it supports everything this app
+needs, including cancellation. The main thing only the XHR backend offers is upload progress
+events, which a search app never uses.
+
+**Signals and RxJS.** RxJS is used where it is strong: the HTTP request, timeout, retry and
+cancellation. Signals are used for what the template reads. The boundary is one `toSignal` in the
+search page, which turns a stream of search states (`idle`, `loading`, `success`, `error`) into a
+signal. The state is a discriminated union, and strict templates narrow it inside `@switch`, so the
+template cannot read `result` while loading.
+
+**Cancellation.** Each search goes through `switchMap`. Starting a new search unsubscribes from the
+previous one, which aborts its request, so a slow earlier response can never overwrite a newer one.
+I considered `rxResource` and `httpResource`, which handle this automatically, but both are marked
+experimental in Angular 20.3. `switchMap` plus `toSignal` is stable, easy to test, and short.
+
+### Trade-offs
+
+- **Regex HTML stripping instead of `DOMParser`.** It keeps the mapper pure and runnable without a
+  DOM, and covers the cases seen in real data. The trade-off is that it decodes only common
+  entities, and text like `x<y and z>w` could be read as a tag. Angular escapes interpolated text,
+  so neither case is a security problem, only a cosmetic one.
+- **Retry-After is mostly theoretical in the browser** because of the CORS headers above. I kept
+  the code because it is small, tested, and correct the day a proxy or a CORS change exposes them.
+- **No cache yet.** Repeating a search costs another request. A small cache keyed by query and
+  page is planned for phase 7.
+- **The temporary UI is deliberately plain.** It proves the data flow end to end; layout, cards and
+  empty states belong to phase 3.
+
+### Likely questions
+
+**Why not use the API response type directly in components?**
+Because nearly every field can be null or oddly formatted. Mapping once means templates deal with
+a predictable shape, and if CORE renames or reshapes a field, one function changes.
+
+**Why don't you retry on a 400?**
+It is deterministic. The same request will fail the same way, and each retry costs one of about 10
+anonymous requests per window. Only 429, 5xx and network errors can succeed on a second try.
+
+**How do you honour the rate limit if the browser can't read the headers?**
+The backoff alone (1, 2, 4 s, capped at 10 s total) handles it. The header is used when it is
+readable. If CORE still says no, the user gets a clear rate-limit message rather than an endless
+spinner. An API key or a server-side proxy with a shared cache would be the real fix.
+
+**Where does the timeout go, and why there?**
+Before `retry`, so each attempt gets its own 15 seconds. When it fires, the subscription ends and
+Angular aborts the request. Timeouts are not retried.
+
+**What happens if the user searches twice quickly?**
+`switchMap` unsubscribes from the first search, which cancels its HTTP request, and only the
+second result is rendered.
+
+**Why `switchMap` and not `rxResource`?**
+`rxResource` would do the same cancellation, but it is experimental in Angular 20.3. For a
+graded project I picked the stable API; switching later is a small change confined to one
+component.
+
+**How did you test the retry timing without waiting?**
+Jasmine's mock clock. The test flushes a 429 with a `Retry-After` three seconds ahead, advances the
+clock 2,999 ms and checks that no request was made, then 1 ms more and checks that the retry
+happened. `HttpTestingController.verify()` fails any test that makes an unexpected request.
+
+**Could the API key leak to another site?**
+The interceptor only adds it when the URL starts with the CORE base URL followed by `/`, and there
+is a test for both a different host and a look-alike URL. It is still visible in the browser's
+network tab, which is why a production deployment would use a proxy.
+
+### Explaining it in 60 seconds
+
+All API access goes through one service, `CoreApiService.searchWorks`. It calls CORE's search
+endpoint with the trailing slash, so there is no redirect wasting a rate-limit token, and excludes
+full text, which can be huge. Each attempt has a 15 second timeout. Rate limits, server errors and
+network failures are retried with exponential backoff, honouring the server's retry time when the
+browser can see it, and never waiting more than 10 seconds in total. Anything else fails at once.
+Every failure becomes an `ApiError` with a kind and a user-friendly message. The raw response is
+mapped into a clean `Paper` model by a pure, well-tested function, so components never handle nulls
+or HTML in abstracts. An interceptor adds the optional API key only for CORE URLs. The search page
+turns a stream of searches into a signal with `switchMap` and `toSignal`, which gives loading and
+error states and cancels the previous request when a new search starts.
