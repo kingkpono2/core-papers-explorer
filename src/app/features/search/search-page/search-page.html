@@ -1,15 +1,48 @@
 <section class="panel" aria-labelledby="search-heading">
   <h1 id="search-heading">Search research papers</h1>
-  <form class="search-form" role="search" (submit)="$event.preventDefault()">
+  <form class="search-form" role="search" (submit)="search($event)">
     <label for="query">Keywords</label>
     <div class="search-form__row">
-      <input id="query" type="search" name="query" [placeholder]="exampleQuery" disabled />
-      <button type="submit" disabled>Search</button>
+      <input
+        #queryInput
+        id="query"
+        type="search"
+        name="query"
+        [placeholder]="exampleQuery"
+        [value]="query()"
+        (input)="query.set(queryInput.value)"
+      />
+      <button type="submit">Search</button>
     </div>
     <p class="hint">Combine terms with AND, OR, NOT and parentheses.</p>
   </form>
 </section>
 
-<section class="results" aria-label="Results">
-  <p>Results will appear here.</p>
+@let current = state();
+<section class="results" aria-label="Results" [attr.aria-busy]="current.status === 'loading'">
+  @switch (current.status) {
+    @case ('idle') {
+      <p class="status" role="status">Enter keywords and press Search.</p>
+    }
+    @case ('loading') {
+      <p class="status" role="status">Searching CORE…</p>
+    }
+    @case ('error') {
+      <p class="status status--error" role="alert">{{ current.error.message }}</p>
+    }
+    @case ('success') {
+      <p class="status" role="status">{{ current.result.total | number }} papers found</p>
+      <ol class="paper-list">
+        @for (paper of current.result.papers; track paper.id) {
+          <li>
+            <a [href]="paper.sourceUrl" target="_blank" rel="noopener">{{ paper.title }}</a>
+            <span class="meta">
+              {{ paper.year ?? 'Year unknown' }} ·
+              {{ paper.authors.length ? paper.authors.join(', ') : 'Unknown authors' }}
+            </span>
+          </li>
+        }
+      </ol>
+    }
+  }
 </section>
