@@ -1,19 +1,26 @@
+:host {
+  display: block;
+  max-width: var(--reading-width);
+  margin-inline: auto;
+}
+
 .panel {
   padding: var(--space-6);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
 
 h1 {
   margin: 0 0 var(--space-4);
-  font-size: 1.5rem;
+  font-size: var(--text-2xl);
+  letter-spacing: -0.015em;
 }
 
 label {
   display: block;
-  margin-bottom: var(--space-1);
+  margin-bottom: var(--space-2);
   font-weight: 600;
 }
 
@@ -24,62 +31,64 @@ label {
 }
 
 input {
-  flex: 1 1 16rem;
+  flex: 1 1 10rem;
   min-width: 0;
+  min-height: 2.75rem;
   padding: var(--space-2) var(--space-3);
   font: inherit;
-  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius);
+  transition: border-color var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-text-muted);
+  }
+
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
 }
 
-button {
-  padding: var(--space-2) var(--space-6);
-  font: inherit;
-  font-weight: 600;
-  color: var(--color-primary-contrast);
-  background: var(--color-primary);
-  border: 0;
-  border-radius: var(--radius);
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
+.button {
+  flex: 0 0 auto;
 }
 
 .hint {
   margin: var(--space-2) 0 0;
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 
 .results {
-  margin-top: var(--space-6);
+  margin-top: var(--space-8);
 }
 
-.status {
-  margin: 0 0 var(--space-4);
-  color: var(--color-text-muted);
+.results__header {
+  margin-bottom: var(--space-4);
+}
 
-  &--error {
-    color: var(--color-danger);
-  }
+h2 {
+  display: inline-block;
+  margin: 0;
+  font-size: var(--text-xl);
+  scroll-margin-top: var(--space-4);
+}
+
+.summary {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+}
+
+.stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
 }
 
 .paper-list {
-  display: grid;
-  gap: var(--space-3);
   margin: 0;
-  padding-left: var(--space-6);
-
-  a {
-    font-weight: 600;
-  }
-}
-
-.meta {
-  display: block;
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
+  padding: 0;
+  list-style: none;
 }
