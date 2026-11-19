@@ -11,6 +11,17 @@ charts how all matching papers are distributed over time.
 
 > Status: work in progress. See the [roadmap](#roadmap) for what is done.
 
+## Features
+
+- Keyword search against CORE, including boolean queries
+- Paper cards with title, authors, year, journal or publisher, document type, language, citation
+  count and a collapsible abstract, plus links to the DOI, the full-text PDF and the CORE page
+- Loading skeletons, a "search to begin" screen with example queries, a no-results screen and
+  error messages with a retry button (with specific wording when CORE rate-limits the app)
+- Responsive layout from phone to desktop, keyboard friendly, with screen reader announcements for
+  result counts and focus moved to the results after each search
+- Retries with backoff on rate limits and transient failures, and a 15 second timeout per request
+
 ## Tech stack
 
 - Angular 20 (standalone components, signals, zoneless change detection, built-in control flow)
@@ -93,10 +104,11 @@ src/
     features/
       search/          the search page (lazy loaded)
     shared/
-      ui/              reusable presentational components
+      ui/              presentational components: paper card, skeleton, empty and error states
     app.config.ts      application providers
     app.routes.ts      routes
   environments/        build-time configuration, including the optional API key
+  testing/             test fixtures shared between specs
 docs/
   WALKTHROUGH.md       design decisions and notes, phase by phase
 ```
@@ -110,7 +122,7 @@ Design decisions are explained in [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md).
 
 - [x] 1. Project setup: Angular 20, strict mode, lint, format, CI, app shell
 - [x] 2. CORE API layer: typed models, service, timeouts, retry with backoff on 429, error handling
-- [ ] 3. Paper cards with loading, empty and error states; responsive and accessible
+- [x] 3. Paper cards with loading, empty and error states; responsive and accessible
 - [ ] 4. Results-per-page control, pagination and state in the URL
 - [ ] 5. Boolean keyword search with validation, help and search history
 - [ ] 6. Chart of papers per year across all matching results
