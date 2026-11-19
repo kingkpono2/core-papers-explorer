@@ -1,0 +1,109 @@
+@let p = paper();
+<article class="card" [attr.aria-labelledby]="titleId">
+  <h3 class="title" [id]="titleId">
+    <a [href]="p.sourceUrl" target="_blank" rel="noopener noreferrer"
+      >{{ p.title }}<span class="visually-hidden"> (opens in a new tab)</span></a
+    >
+  </h3>
+
+  @if (p.authors.length) {
+    <p class="authors" [attr.title]="allAuthors()">
+      {{ visibleAuthors() }}
+      @if (allAuthors()) {
+        <span class="et-al">et al.</span>
+      }
+    </p>
+  }
+
+  @if (p.year || p.journal || publisher() || p.citationCount) {
+    <ul class="meta">
+      @if (p.year) {
+        <li>
+          <time [attr.datetime]="p.publishedDate ?? p.year">{{ p.year }}</time>
+        </li>
+      }
+      @if (p.journal) {
+        <li class="journal">{{ p.journal }}</li>
+      }
+      @if (publisher(); as publisher) {
+        <li>{{ publisher }}</li>
+      }
+      @if (p.citationCount) {
+        <li>
+          {{ p.citationCount | number }} {{ p.citationCount === 1 ? 'citation' : 'citations' }}
+        </li>
+      }
+    </ul>
+  }
+
+  @if (p.abstract; as abstract) {
+    <p
+      class="abstract"
+      [id]="abstractId"
+      [class.abstract--clamped]="abstractIsLong() && !abstractExpanded()"
+    >
+      {{ abstract }}
+    </p>
+    @if (abstractIsLong()) {
+      <button
+        type="button"
+        class="toggle"
+        [attr.aria-expanded]="abstractExpanded()"
+        [attr.aria-controls]="abstractId"
+        (click)="abstractExpanded.set(!abstractExpanded())"
+      >
+        {{ abstractExpanded() ? 'Show less' : 'Show more' }}
+      </button>
+    }
+  }
+
+  <footer class="footer">
+    @if (p.documentType || p.language) {
+      <ul class="tags">
+        @if (p.documentType) {
+          <li class="tag">{{ p.documentType }}</li>
+        }
+        @if (p.language) {
+          <li class="tag">{{ p.language }}</li>
+        }
+      </ul>
+    }
+    <ul class="actions">
+      @if (p.doiUrl) {
+        <li>
+          <a
+            class="action"
+            [href]="p.doiUrl"
+            [attr.title]="p.doi"
+            [attr.aria-describedby]="titleId"
+            target="_blank"
+            rel="noopener noreferrer"
+            >DOI<span class="visually-hidden"> (opens in a new tab)</span></a
+          >
+        </li>
+      }
+      @if (p.downloadUrl) {
+        <li>
+          <a
+            class="action"
+            [href]="p.downloadUrl"
+            [attr.aria-describedby]="titleId"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Full text (PDF)<span class="visually-hidden"> (opens in a new tab)</span></a
+          >
+        </li>
+      }
+      <li>
+        <a
+          class="action"
+          [href]="p.coreUrl"
+          [attr.aria-describedby]="titleId"
+          target="_blank"
+          rel="noopener noreferrer"
+          >View on CORE<span class="visually-hidden"> (opens in a new tab)</span></a
+        >
+      </li>
+    </ul>
+  </footer>
+</article>

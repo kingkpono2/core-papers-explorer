@@ -43,6 +43,7 @@ describe('paper mapper', () => {
         citationCount: 7,
         language: 'English',
         sourceUrl: 'https://core.ac.uk/works/42',
+        coreUrl: 'https://core.ac.uk/works/42',
       });
     });
 

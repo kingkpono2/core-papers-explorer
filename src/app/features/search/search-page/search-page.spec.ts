@@ -22,6 +22,7 @@ const paper = (id: string, title: string, overrides: Partial<Paper> = {}): Paper
   citationCount: null,
   language: null,
   sourceUrl: `https://core.ac.uk/works/${id}`,
+  coreUrl: `https://core.ac.uk/works/${id}`,
   ...overrides,
 });
 

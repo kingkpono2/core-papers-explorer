@@ -16,6 +16,8 @@ export interface Paper {
   language: string | null;
   /** Best page to open for the paper: CORE's landing page, its reader, or the DOI. */
   sourceUrl: string;
+  /** The paper's page on core.ac.uk. */
+  coreUrl: string;
 }
 
 export interface SearchRequest {

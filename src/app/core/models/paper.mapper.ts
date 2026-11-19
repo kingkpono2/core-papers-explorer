@@ -28,6 +28,7 @@ export function toPaper(work: CoreWork): Paper {
   const id = String(work.id);
   const doi = normalizeDoi(work.doi);
   const doiUrl = doi ? `https://doi.org/${encodeURIComponent(doi).replace(/%2F/gi, '/')}` : null;
+  const coreUrl = `https://core.ac.uk/works/${encodeURIComponent(id)}`;
 
   return {
     id,
@@ -44,7 +45,8 @@ export function toPaper(work: CoreWork): Paper {
     documentType: cleanText(work.documentType),
     citationCount: integerAtLeast(work.citationCount, 0),
     language: cleanText(work.language?.name),
-    sourceUrl: landingUrl(work.links) ?? doiUrl ?? `https://core.ac.uk/works/${id}`,
+    sourceUrl: landingUrl(work.links) ?? doiUrl ?? coreUrl,
+    coreUrl,
   };
 }
 
