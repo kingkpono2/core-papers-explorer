@@ -49,8 +49,8 @@ export function isTransient(error: unknown): error is HttpErrorResponse {
 /**
  * Milliseconds until the server allows another request. CORE sends `X-RateLimit-Retry-After` as a
  * timestamp such as `2026-11-19T21:47:53+0000`; the standard `Retry-After` may be seconds or a date.
- * CORE does not list these headers in Access-Control-Expose-Headers, so browsers currently see
- * null here and the exponential backoff applies.
+ * CORE does not list these headers in Access-Control-Expose-Headers, but the app calls CORE through
+ * a same-origin proxy, so the browser can read them.
  */
 export function retryAfterMs(headers: HttpHeaders, now = Date.now()): number | null {
   const value = (headers.get('X-RateLimit-Retry-After') ?? headers.get('Retry-After'))?.trim();

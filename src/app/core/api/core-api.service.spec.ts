@@ -11,7 +11,7 @@ import { CoreApiService } from './core-api.service';
 const config: CoreApiConfig = {
   baseUrl: 'https://api.test/v3',
   apiKey: '',
-  timeoutMs: 15_000,
+  timeoutMs: 30_000,
   retry: { maxRetries: 3, baseDelayMs: 1_000, maxTotalDelayMs: 10_000 },
 };
 
@@ -147,8 +147,10 @@ describe('CoreApiService', () => {
     search();
     const req = http.expectOne(isSearch);
 
-    jasmine.clock().tick(15_000);
+    jasmine.clock().tick(29_999);
+    expect(req.cancelled).toBeFalse();
 
+    jasmine.clock().tick(1);
     expect(req.cancelled).toBeTrue();
     expect(error?.kind).toBe('timeout');
     http.expectNone(isSearch);
