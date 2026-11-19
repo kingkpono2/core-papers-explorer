@@ -7,12 +7,12 @@ import { CoreApiService } from '../api/core-api.service';
 import { apiKeyInterceptor } from './api-key.interceptor';
 
 describe('apiKeyInterceptor', () => {
-  const searchUrl = 'https://api.test/v3/search/works/';
+  const searchUrl = '/core-api/v3/search/works/';
   let controller: HttpTestingController;
 
-  const configure = (apiKey: string) => {
+  const configure = (apiKey: string, baseUrl = '/core-api/v3') => {
     const config: CoreApiConfig = {
-      baseUrl: 'https://api.test/v3',
+      baseUrl,
       apiKey,
       timeoutMs: 15_000,
       retry: { maxRetries: 0, baseDelayMs: 0, maxTotalDelayMs: 0 },
@@ -50,13 +50,27 @@ describe('apiKeyInterceptor', () => {
     expect(authorizationHeader(searchUrl)).toBeNull();
   });
 
-  it('never sends the key to other hosts', () => {
+  it('never sends the key to other hosts or paths', () => {
     configure('secret');
     const http = TestBed.inject(HttpClient);
-    http.get('https://example.com/v3/search/works/').subscribe();
+    const others = [
+      'https://example.com/core-api/v3/search/works/',
+      '//example.com/core-api/v3/search/works/',
+      '/core-api/v3x/search/works/',
+      '/elsewhere/core-api/v3/search/works/',
+    ];
+    others.forEach((url) => http.get(url).subscribe());
+
+    others.forEach((url) => expect(authorizationHeader(url)).withContext(url).toBeNull());
+  });
+
+  it('also works with an absolute base URL', () => {
+    configure('secret', 'https://api.test/v3');
+    const http = TestBed.inject(HttpClient);
+    http.get('https://api.test/v3/search/works/').subscribe();
     http.get('https://api.test.example.com/v3/search/works/').subscribe();
 
-    expect(authorizationHeader('https://example.com/v3/search/works/')).toBeNull();
+    expect(authorizationHeader('https://api.test/v3/search/works/')).toBe('Bearer secret');
     expect(authorizationHeader('https://api.test.example.com/v3/search/works/')).toBeNull();
   });
 });

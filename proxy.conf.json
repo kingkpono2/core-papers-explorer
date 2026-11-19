@@ -1,0 +1,8 @@
+{
+  "/core-api": {
+    "target": "https://api.core.ac.uk",
+    "pathRewrite": { "^/core-api": "" },
+    "changeOrigin": true,
+    "secure": true
+  }
+}

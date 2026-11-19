@@ -2,6 +2,6 @@ import { AppEnvironment } from './app-environment';
 
 export const environment: AppEnvironment = {
   production: true,
-  coreApiBaseUrl: 'https://api.core.ac.uk/v3',
+  coreApiBaseUrl: '/core-api/v3',
   coreApiKey: '',
 };
