@@ -1,0 +1,42 @@
+.toggle {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, currentcolor 45%, transparent);
+  border-radius: var(--radius-pill);
+}
+
+.option {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+
+  &:hover {
+    background: color-mix(in srgb, currentcolor 15%, transparent);
+  }
+
+  &:has(:checked) {
+    color: var(--color-header-bg);
+    background: var(--color-header-text);
+  }
+
+  &:has(:focus-visible) {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 1px;
+  }
+}
+
+svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

@@ -4,8 +4,10 @@
   min-height: 100vh;
 }
 
+// At least a screen tall, so the footer does not jump down when the lazy-loaded page arrives.
 main {
   flex: 1;
+  min-height: 100vh;
   padding-block: var(--space-8);
 }
 

@@ -9,39 +9,98 @@ A small Angular app for searching open-access research papers through the
 are returned, supports boolean keyword queries such as `(drone AND (package OR delivery))`, and
 charts how all matching papers are distributed over time.
 
-> Status: work in progress. See the [roadmap](#roadmap) for what is done.
-
 ## Features
 
-- Keyword search against CORE with boolean queries: AND, OR, NOT, brackets, phrases, fields such
-  as `title:` and `authors:`, year comparisons and wildcards
-- The query is checked as you type: unbalanced brackets, dangling operators, unclosed quotes,
-  unknown fields and other mistakes are explained under the search box, with the offending part
-  marked, and a query with errors is never sent to CORE. Warnings, such as lowercase `and`, explain
-  what CORE will do without blocking the search
-- A "How to search" panel with the syntax, CORE's quirks, example queries that run with one click
-  and buttons that insert a field at the cursor
-- The last eight searches are kept as one-click chips, with a button to clear them
-- Search terms are highlighted in titles and abstracts
-- A chart of when all matching papers were published, not only the ones on the page, with
-  tooltips, keyboard navigation, a table view, and a click on a bar to search that year only
-  (see [Chart](#chart))
-- A results-per-page choice (10, 25, 50 or 100), remembered for the next visit
-- Pagination with Previous/Next and page numbers ("Showing 26–50 of 71,213"), compact on phones
-- The query, page and page size live in the URL, so searches can be bookmarked and shared and the
-  browser's Back and Forward buttons step through them
-- Paper cards with title, authors, year, journal or publisher, document type, language, citation
-  count and a collapsible abstract, plus links to the DOI, the full-text PDF and the CORE page
-- Loading skeletons, a "search to begin" screen with example queries, a no-results screen and
-  error messages with a retry button (with specific wording when CORE rate-limits the app)
-- Responsive layout from phone to desktop, keyboard friendly, with screen reader announcements for
-  result counts and focus moved to the results after each search
-- Retries with backoff on rate limits and transient failures, and a 30 second timeout per request
-- One results request per user action, plus one chart request per new query; paging, changing the
-  page size and repeated or cosmetic URL changes never trigger another search or chart request
+### Required by the brief
 
-CORE serves at most 100 results per request and only the first 10,000 results of any search, so
-pagination stops at the 10,000th result and says so.
+- Keyword search of CORE's research papers, including boolean queries such as
+  `(drone AND (package OR delivery))`
+- A list of matching papers with title, authors, year, journal or publisher, document type,
+  language, citation count, a collapsible abstract and links to the DOI, full text and CORE page
+- A choice of how many results are returned (10, 25, 50 or 100), with pagination
+- A chart of how many matching papers were published each year, counted across all matches, not
+  only the page on screen (see [Chart](#chart))
+
+### Extras (beyond the brief)
+
+Search
+
+- Query validation as you type: unbalanced brackets, dangling operators, unclosed quotes, unknown
+  fields (with "Did you mean" suggestions) and other mistakes are explained under the search box
+  with the offending part marked, and a query with errors is never sent to CORE. Warnings explain
+  what CORE will do with lowercase `and` or a nested OR group
+- A "How to search" panel with the syntax, CORE's quirks, runnable examples and buttons that insert
+  a field at the cursor
+- The last eight searches as one-click chips, and search terms highlighted in titles and abstracts
+- The query, page and page size live in the URL, so searches can be bookmarked and shared and Back
+  and Forward step through them; the tab title shows the query ("drone — CORE Papers Explorer"),
+  and unknown paths lead back to the search
+- A Share button (the system share sheet on phones, copy to clipboard elsewhere) and `/` to jump to
+  the search box
+- Export of the current page as CSV (RFC 4180, guarded against spreadsheet formula injection) or
+  BibTeX (keys such as `smith2020`, special characters escaped)
+
+Chart
+
+- One request with CORE's aggregation endpoint instead of one per year, loaded after the results
+  so it never delays them
+- Click (or press Enter on) a bar to search that year only; tooltips, keyboard navigation and a
+  table view
+
+Speed and resilience
+
+- Pages seen in the last five minutes are kept in memory, so Back, Forward and revisiting a page
+  show results at once without a request; chart counts are kept per query for the session
+- One request per user action: paging and page size changes never refetch the chart, and repeated
+  or cosmetic URL changes never search again. A new search cancels the one in flight
+- Exponential backoff that respects CORE's `X-RateLimit-Retry-After`, a 30 second timeout, and no
+  retries for errors that would fail again
+- Loading skeletons, a no-results screen and error messages with Retry, worded for rate limits,
+  timeouts, network failures and bad queries
+
+Look and accessibility
+
+- Light and dark themes that follow the system setting, with a switch in the header that is
+  remembered; every text colour meets WCAG AA contrast in both
+- Responsive from phone to desktop, keyboard friendly throughout, with a skip link, visible focus,
+  live announcements of result counts, focus moved to the results after each search, and reduced
+  motion respected. Checked with axe-core in both themes at phone and desktop widths, with no
+  violations
+- Placeholders the size of the content they replace, system fonts and no images, so the page
+  barely moves while results and the chart load (cumulative layout shift under 0.03 in testing);
+  about 100 KB of compressed JavaScript and CSS on first load
+
+Engineering
+
+- A Vercel function in front of CORE that keeps the API key on the server, lets the CDN cache
+  searches for five minutes and only allows the two endpoints the app uses (see
+  [Deployment](#deployment))
+- 321 unit tests (Karma) and 34 tests for the serverless function (`node --test`), run with lint,
+  format check and a production build on every push by GitHub Actions
+- Deployed on Vercel with preview deployments for branches
+
+## Known CORE API quirks handled
+
+- **CORS.** CORE only allows `localhost` and `core.ac.uk` origins, so the app calls it through a
+  same-origin proxy (the dev server locally, the Vercel function in production).
+- **Rate limits.** About 10 searches per window anonymously. The app retries 429s after CORE's
+  `X-RateLimit-Retry-After`, keeps requests to one per action, and caches in the browser and the
+  CDN; the deployed function uses an API key.
+- **Nested OR groups are ignored.** `(drone AND (package OR delivery))` returns every drone paper
+  (71,213), because CORE drops an OR group inside other brackets. The app removes brackets around
+  the whole query (4,729 papers) and warns about any nesting that remains.
+- **Malformed queries.** Some, such as an unknown field or a range in square brackets, make CORE
+  fail with a `500` ("Azure search failed with status code: 400"); others quietly return results
+  for something else. The app validates queries first, and treats those `500`s as bad queries that
+  are not retried.
+- **Lowercase operators and the default OR.** CORE reads `and`, `or` and `not` as operators and
+  joins plain words with OR; the validator says so.
+- **Result window.** At most 100 results per request and only the first 10,000 of a search, so
+  pagination stops there and says why. A missing trailing slash on `/search/works/` costs a
+  redirect and a rate-limit token.
+- **Aggregation.** POST only, at most 100 years (the busiest ones, so older counts are shown as
+  "at least"), and some impossible years such as 1000 or 9999, which the chart leaves out and
+  reports.
 
 ## Search syntax
 
@@ -182,11 +241,15 @@ Anonymous access allows about 10 requests per rate-limit window. When CORE answe
 Requests`, or a request fails with a 5xx or network error, the client retries up to three times
 with exponential backoff (1 s, 2 s, 4 s), spending at most 10 seconds waiting. If the server says
 to wait longer than that, the app stops and shows a message instead. Each attempt times out after
-30 seconds, because cold searches on CORE can be slow; timeouts are not retried.
+30 seconds, because cold searches on CORE can be slow; timeouts are not retried, and neither are
+CORE's `500`s for a query it cannot parse (see [quirks](#known-core-api-quirks-handled)).
 
-In production two things keep the app well inside the limit: the function sends the server-side API
-key, so CORE no longer applies the anonymous limit shared by everyone behind Vercel's IP addresses,
-and Vercel's CDN answers repeated searches from its cache for five minutes without calling CORE.
+The browser keeps the pages of results it has seen for five minutes (an LRU cache of 30 pages), so
+Back, Forward and returning to a page cost nothing; pressing Search again for the same query, or
+Retry, always asks CORE. In production two more things keep the app well inside the limit: the
+function sends the server-side API key, so CORE no longer applies the anonymous limit shared by
+everyone behind Vercel's IP addresses, and Vercel's CDN answers repeated searches from its cache
+for five minutes without calling CORE.
 
 ## Deployment
 
@@ -216,7 +279,8 @@ origins, so a browser on any other site cannot read its responses. The app there
 - gives CORE 25 seconds (the app waits 30 per attempt) and turns a timeout into `504` and a network
   failure into `502`, both as JSON `{ "error": "..." }`.
 - passes on CORE's status, JSON body, `Content-Type` and rate-limit headers (`X-RateLimit-*`,
-  `Retry-After`), which the app's retry logic reads.
+  `Retry-After`), which the app's retry logic reads. CORE labels some JSON errors `text/html`;
+  those are passed on as JSON, so the app can read why a query was rejected.
 - marks successful searches `Cache-Control: public, s-maxage=300, stale-while-revalidate=600`, so
   Vercel's CDN serves the same search URL from its cache for five minutes and refreshes it in the
   background for ten more. Errors, including `429`, and aggregation answers are `no-store`.
@@ -250,14 +314,18 @@ src/
   app/
     core/              app-wide singletons
       api/             CoreApiService, retry policy, error model, API config token
+      cache/           the LRU cache with expiry used for results and chart counts
       interceptors/    adds the optional API key to CORE requests
-      layout/          site header and footer
+      layout/          site header and footer, theme switch
       models/          raw CORE API types, the app's Paper model and the mapper between them
+      routing/         tab titles that include the query
+      theme/           the saved light or dark theme
     features/
       search/          the search page (lazy loaded), search bar, help panel, URL params, paging
-                       maths, page size preference and recent searches
+                       maths, page size preference, recent searches, results cache, share button
         query/         query analyser (tokenizer, parser, diagnostics) and the CORE workarounds
         chart/         the publication years chart, its per-query cache and year bucketing
+        export/        CSV and BibTeX export and the Export menu
     shared/
       ui/              presentational components: paper card, skeleton, empty and error states,
                        pagination, term highlighting, bar chart
@@ -285,4 +353,4 @@ Built with Claude Code as an AI pair-programmer; I reviewed, tested and understa
 - [x] 4. Results-per-page control, pagination and state in the URL
 - [x] 5. Boolean keyword search with validation, help and search history
 - [x] 6. Chart of papers per year across all matching results
-- [ ] 7. Extras: response cache, CSV/BibTeX export, dark mode
+- [x] 7. Extras: results cache, CSV and BibTeX export, dark mode, share link, shortcuts, polish

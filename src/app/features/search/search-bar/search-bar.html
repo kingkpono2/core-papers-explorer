@@ -9,6 +9,7 @@
       autocomplete="off"
       spellcheck="false"
       aria-describedby="query-problems query-hint"
+      aria-keyshortcuts="/"
       [attr.aria-invalid]="invalid() || null"
       [placeholder]="placeholder"
       [value]="text()"
@@ -45,7 +46,10 @@
   </div>
 
   <div class="meta">
-    <p id="query-hint" class="hint">Combine terms with AND, OR, NOT and brackets.</p>
+    <p id="query-hint" class="hint">
+      Combine terms with AND, OR, NOT and brackets.
+      <span class="hint__shortcut">Press <kbd>/</kbd> to jump here.</span>
+    </p>
     <ng-content />
     <!-- Last in the row, so the panel it opens comes next in the tab order. -->
     <button
@@ -68,11 +72,11 @@
     />
   </div>
 
-  @if (recent.queries().length) {
+  @if (history().length) {
     <div class="recent">
       <p id="recent-label" class="recent__label">Recent searches</p>
       <ul class="recent__list" aria-labelledby="recent-label">
-        @for (query of recent.queries(); track query) {
+        @for (query of history(); track query) {
           <li>
             <button type="button" class="chip recent__chip" [title]="query" (click)="run(query)">
               {{ query }}

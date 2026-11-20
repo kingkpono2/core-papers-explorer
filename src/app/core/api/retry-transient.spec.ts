@@ -39,6 +39,15 @@ describe('isTransient', () => {
     ]);
   });
 
+  it("treats CORE's 500 for a rejected query as permanent", () => {
+    const error = new HttpErrorResponse({
+      status: 500,
+      error: { message: 'Azure search failed with status code: 400. Error context: …' },
+    });
+
+    expect(isTransient(error)).toBeFalse();
+  });
+
   it('treats other client errors and non-HTTP errors as permanent', () => {
     expect(isTransient(httpError(400))).toBeFalse();
     expect(isTransient(httpError(404))).toBeFalse();

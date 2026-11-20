@@ -9,6 +9,7 @@ import {
   linkedSignal,
   output,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { Diagnostic, analyseQuery, normaliseQuery } from '../query/query-analyser';
@@ -33,13 +34,14 @@ interface Problem extends Diagnostic {
   templateUrl: './search-bar.html',
   styleUrl: './search-bar.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(document:keydown)': 'focusOnShortcut($event)' },
 })
 export class SearchBar {
   /** The query in the URL. */
   readonly query = input('');
   readonly searched = output<string>();
 
-  protected readonly recent = inject(RecentSearches);
+  private readonly recent = inject(RecentSearches);
   private readonly input = viewChild.required<ElementRef<HTMLInputElement>>('queryInput');
   private readonly helpToggle = viewChild.required<ElementRef<HTMLButtonElement>>('helpToggle');
   private timer?: ReturnType<typeof setTimeout>;
@@ -50,6 +52,14 @@ export class SearchBar {
   private readonly checked = linkedSignal(() => this.query());
   private readonly submitted = linkedSignal({ source: this.query, computation: () => false });
   protected readonly helpOpen = signal(false);
+  /**
+   * Recent searches as they were when the query last changed. A search is saved once CORE answers
+   * it, and listing it there and then would push the results down as they appear.
+   */
+  protected readonly history = linkedSignal({
+    source: this.query,
+    computation: () => untracked(this.recent.queries),
+  });
 
   protected readonly problems = computed<Problem[]>(() => {
     const text = this.checked();
@@ -129,8 +139,29 @@ export class SearchBar {
     this.helpToggle().nativeElement.focus();
   }
 
+  /** `/` jumps to the search box, as on many sites, unless the user is typing somewhere. */
+  protected focusOnShortcut(event: KeyboardEvent): void {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (
+      event.key !== '/' ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.defaultPrevented ||
+      target?.isContentEditable ||
+      target?.closest('input, textarea, select')
+    ) {
+      return;
+    }
+    event.preventDefault();
+    const field = this.input().nativeElement;
+    field.focus();
+    field.select();
+  }
+
   protected clearHistory(): void {
     this.recent.clear();
+    this.history.set([]);
     this.input().nativeElement.focus();
   }
 }

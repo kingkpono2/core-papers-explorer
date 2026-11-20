@@ -87,6 +87,8 @@ describe('YearChart', () => {
     await render(settled());
     expect(countByYear).toHaveBeenCalledOnceWith(BRIEF);
     expect(el.querySelector('.skeleton')).not.toBeNull();
+    // The caption is there while loading, so the chart does not grow when the counts arrive.
+    expect(text('.caption')).toContain('All 4,729 matching papers');
   });
 
   it('draws a bar per year with readable labels and explains what is counted', async () => {

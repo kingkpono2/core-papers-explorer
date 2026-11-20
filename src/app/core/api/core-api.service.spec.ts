@@ -143,6 +143,20 @@ describe('CoreApiService', () => {
     expect(error?.kind).toBe('bad-query');
   });
 
+  it("does not retry CORE's 500 for a query its search engine rejects", () => {
+    search('drone AND foo:bar');
+    http
+      .expectOne(isSearch)
+      .flush(
+        { message: 'Azure search failed with status code: 400. foo is not a searchable field.' },
+        { status: 500, statusText: 'Internal Server Error' },
+      );
+
+    jasmine.clock().tick(10_000);
+    http.expectNone(isSearch);
+    expect(error?.kind).toBe('bad-query');
+  });
+
   it('times out and cancels a slow request', () => {
     search();
     const req = http.expectOne(isSearch);

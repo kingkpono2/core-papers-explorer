@@ -312,9 +312,14 @@ export function createHandler({
 
     const headers = pickResponseHeaders(upstream.headers);
     if (!/\bjson\b/i.test(headers['content-type'] ?? '')) {
-      delete headers['content-type'];
-      const status = upstream.status >= 400 ? upstream.status : 502;
-      return sendError(res, status, `CORE answered ${upstream.status} without JSON.`, headers);
+      // CORE labels some JSON errors text/html, such as the 500 for a query its search engine
+      // rejects. The message in them is what tells the app not to retry.
+      if (!isJson(body)) {
+        delete headers['content-type'];
+        const status = upstream.status >= 400 ? upstream.status : 502;
+        return sendError(res, status, `CORE answered ${upstream.status} without JSON.`, headers);
+      }
+      headers['content-type'] = JSON_TYPE;
     }
     send(res, upstream.status, redactKey(body, apiKey), {
       ...headers,
@@ -323,4 +328,13 @@ export function createHandler({
       'x-core-auth': apiKey?.trim() ? 'key' : 'anonymous',
     });
   };
+}
+
+function isJson(text) {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
 }

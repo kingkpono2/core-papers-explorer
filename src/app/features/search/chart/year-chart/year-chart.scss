@@ -12,6 +12,7 @@
 
 .header {
   display: flex;
+  min-height: 2rem;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
@@ -78,6 +79,16 @@ h2 {
   align-items: flex-end;
   gap: 6px;
   padding-inline: var(--space-2);
+
+  // Matches the plot area of the bar chart, inside its 220px.
+  &--loading {
+    margin-block: 24px 26px;
+  }
+}
+
+.notes-placeholder {
+  height: calc(5 * var(--leading-normal) * var(--text-sm) + 3 * var(--space-1));
+  margin-top: var(--space-3);
 }
 
 .skeleton__bar {

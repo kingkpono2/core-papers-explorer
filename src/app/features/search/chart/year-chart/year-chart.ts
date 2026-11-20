@@ -90,7 +90,7 @@ export class YearChart {
     switch (counts.status) {
       case 'idle':
       case 'loading':
-        return { status: 'loading' as const };
+        return { status: 'loading' as const, total: this.formatTotal(search) };
       case 'error':
         return { status: 'error' as const, error: counts.error };
       case 'success':
@@ -119,6 +119,10 @@ export class YearChart {
     }
   }
 
+  private formatTotal({ total }: ChartSearch): string | null {
+    return total === null ? null : this.numbers.format(total);
+  }
+
   private describe(search: ChartSearch, { counts, truncated }: YearCounts) {
     const { buckets, dated } = buildYearSeries(counts, this.currentYear());
     if (!dated) {
@@ -133,7 +137,7 @@ export class YearChart {
       earlier && `${truncated ? 'At least ' : ''}${this.numbers.format(earlier.count)}`;
     return {
       status: 'success' as const,
-      total: search.total === null ? null : this.numbers.format(search.total),
+      total: this.formatTotal(search),
       bars: years.map((bucket) => this.toBar(bucket)),
       rows: [
         ...(earlier ? [{ label: `Before ${earlier.year}`, count: earlierCount! }] : []),

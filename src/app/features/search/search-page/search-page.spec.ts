@@ -190,12 +190,16 @@ describe('SearchPage', () => {
       expect(marks).toEqual(['drone', 'Drones']);
     });
 
-    it('remembers successful searches', async () => {
+    it('remembers successful searches and lists them from the next search on', async () => {
       await submit('robots');
       expect(recentQueries()).toEqual([]);
 
       await respond(resultOf(1, papers(1)));
       expect(recentQueries()).toEqual(['robots']);
+      // Not straight away, which would push the results down as they appear.
+      expect(el.querySelector('.recent')).toBeNull();
+
+      await submit('drones');
       expect(el.querySelector('.recent')?.textContent).toContain('robots');
     });
 
@@ -237,6 +241,16 @@ describe('SearchPage', () => {
       expect(summary()).toBe('No papers found for “qwxzv”');
       expect(el.querySelector('app-empty-state')?.textContent).toContain('Nothing matched “qwxzv”');
       expect(el.querySelector('ol')).toBeNull();
+      expect(el.querySelector('app-export-menu')).toBeNull();
+    });
+
+    it('offers to share the search and export the papers on the page', async () => {
+      await submit('drone');
+      expect(el.querySelector('.results__actions')).toBeNull();
+
+      await respond(resultOf(30, papers(10)));
+      expect(el.querySelector('app-share-link button')).not.toBeNull();
+      expect(el.querySelector('app-export-menu')?.textContent).toContain('This page (10 papers)');
     });
 
     it('shows the error and retries the same search', async () => {
@@ -330,10 +344,10 @@ describe('SearchPage', () => {
       expect(lastRequest()).toEqual({ query: 'robots', limit: 25, offset: 0 });
     });
 
-    it('restores the previous search on Back', async () => {
+    it('restores the previous search on Back from the cache, without a request', async () => {
       await open();
       await submit('first');
-      await respond(resultOf(1, papers(1)));
+      await respond(resultOf(1, [makePaper({ title: 'First paper' })]));
       await submit('second');
       await respond(resultOf(1, papers(1)));
 
@@ -341,6 +355,20 @@ describe('SearchPage', () => {
 
       expect(url()).toBe('/?q=first&size=10');
       expect(input().value).toBe('first');
+      expect(searchWorks).toHaveBeenCalledTimes(2);
+      expect(results().textContent).toContain('First paper');
+      expect(summary()).toBe('Showing 1 of 1 paper for “first”');
+    });
+
+    it('asks CORE again on Back when the earlier search failed', async () => {
+      await open();
+      await submit('first');
+      await fail(new ApiError('server'));
+      await submit('second');
+      await respond(resultOf(1, papers(1)));
+
+      await back();
+
       expect(searchWorks).toHaveBeenCalledTimes(3);
       expect(lastRequest()).toEqual({ query: 'first', limit: 10, offset: 0 });
     });
@@ -406,8 +434,8 @@ describe('SearchPage', () => {
       await back();
 
       expect(url()).toBe('/?q=drone&size=25');
-      expect(lastRequest()).toEqual({ query: 'drone', limit: 25, offset: 0 });
-      expect(searchWorks).toHaveBeenCalledTimes(3);
+      expect(summary()).toBe('Showing 1–25 of 71,213 papers for “drone”');
+      expect(searchWorks).toHaveBeenCalledTimes(2);
     });
 
     it('stops at the 10,000th result and says why', async () => {

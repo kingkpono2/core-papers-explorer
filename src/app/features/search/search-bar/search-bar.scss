@@ -131,6 +131,22 @@ input {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+
+  kbd {
+    padding: 0 0.35em;
+    font-family: var(--font-mono);
+    color: var(--color-text);
+    background: var(--color-surface-muted);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+  }
+}
+
+// Keyboard shortcuts mean little on touch screens.
+@media not (hover: hover) {
+  .hint__shortcut {
+    display: none;
+  }
 }
 
 .help-toggle,
