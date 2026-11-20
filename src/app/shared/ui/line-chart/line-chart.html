@@ -1,0 +1,115 @@
+<ul class="legend">
+  @for (item of legend(); track item.key) {
+    <li class="legend__item">
+      <svg class="swatch" viewBox="0 0 24 12" aria-hidden="true" focusable="false">
+        <line [class]="'series-' + item.slot" class="swatch__line" x1="0" x2="24" y1="6" y2="6" />
+        <use [attr.href]="'#line-chart-marker-' + item.slot" x="12" y="6" />
+      </svg>
+      {{ item.label }}
+    </li>
+  }
+</ul>
+
+@let chart = layout();
+<div class="plot">
+  @if (width()) {
+    <svg
+      class="chart"
+      [attr.width]="chart.width"
+      [attr.height]="height"
+      [attr.viewBox]="'0 0 ' + chart.width + ' ' + height"
+      role="group"
+      [attr.aria-label]="label()"
+    >
+      <defs>
+        <!-- Each series has its own marker shape, so it can be told apart without colour. -->
+        <circle id="line-chart-marker-1" class="marker series-1" r="4.5" />
+        <rect id="line-chart-marker-2" class="marker series-2" x="-4" y="-4" width="8" height="8" />
+        <path id="line-chart-marker-3" class="marker series-3" d="M0,-5.5L5,3.5H-5Z" />
+      </defs>
+
+      <g aria-hidden="true">
+        @for (tick of chart.ticks; track tick.value) {
+          <line
+            class="grid"
+            [class.grid--base]="!tick.value"
+            [attr.x1]="chart.left"
+            [attr.x2]="chart.right"
+            [attr.y1]="tick.y"
+            [attr.y2]="tick.y"
+          />
+          <text class="tick" [attr.x]="chart.left - 8" [attr.y]="tick.y" dy="0.32em">
+            {{ tick.label }}
+          </text>
+        }
+        @for (column of chart.columns; track column.category.key) {
+          @if (column.showLabel) {
+            <text class="label" [attr.x]="column.center" [attr.y]="chart.baseline + 18">
+              {{ column.category.label }}
+            </text>
+          }
+        }
+      </g>
+
+      @let activeIndex = active();
+      @if (activeIndex !== null && chart.columns[activeIndex]; as column) {
+        <line
+          class="crosshair"
+          aria-hidden="true"
+          [attr.x1]="column.center"
+          [attr.x2]="column.center"
+          [attr.y1]="chart.top"
+          [attr.y2]="chart.baseline"
+        />
+      }
+
+      <g aria-hidden="true">
+        @for (line of chart.lines; track line.key) {
+          <path class="line" [class]="'series-' + line.slot" [attr.d]="line.path" />
+          @for (point of line.points; track point.index) {
+            <use
+              [attr.href]="'#line-chart-marker-' + line.slot"
+              [attr.x]="point.x"
+              [attr.y]="point.y"
+              [class.is-active]="activeIndex === point.index"
+            />
+          }
+        }
+      </g>
+
+      @for (column of chart.columns; track column.category.key; let i = $index) {
+        <rect
+          #hit
+          class="hit"
+          [attr.x]="column.x"
+          [attr.y]="chart.top"
+          [attr.width]="chart.band"
+          [attr.height]="chart.plotHeight"
+          [attr.tabindex]="focusable() === i ? 0 : -1"
+          role="img"
+          [attr.aria-label]="column.description"
+          (mouseenter)="active.set(i)"
+          (mouseleave)="active.set(null)"
+          (focus)="focus(i)"
+          (blur)="active.set(null)"
+          (keydown)="onKeydown($event, i)"
+        />
+      }
+    </svg>
+  }
+
+  @if (tooltip(); as tip) {
+    <div class="tooltip" aria-hidden="true" [style.left.px]="tip.x" [style.top.px]="tip.y">
+      <p class="tooltip__heading">{{ tip.heading }}</p>
+      @for (row of tip.rows; track row.key) {
+        <p class="tooltip__row">
+          <svg class="tooltip__marker" viewBox="-6 -6 12 12" aria-hidden="true" focusable="false">
+            <use [attr.href]="'#line-chart-marker-' + row.slot" />
+          </svg>
+          <span class="tooltip__label">{{ row.label }}</span>
+          <span class="tooltip__value">{{ row.value }}</span>
+        </p>
+      }
+    </div>
+  }
+</div>

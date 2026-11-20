@@ -25,6 +25,9 @@
   --color-skeleton-highlight: #2d3745;
   --color-header-bg: #15233f;
   --color-header-text: #e6eaf0;
+  --color-series-1: #3987e5;
+  --color-series-2: #d95926;
+  --color-series-3: #199e70;
 
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%), 0 1px 3px rgb(0 0 0 / 30%);
   --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 45%), 0 2px 4px -2px rgb(0 0 0 / 35%);
@@ -54,6 +57,11 @@
   --color-skeleton-highlight: #f1f4f7;
   --color-header-bg: #1d4ed8;
   --color-header-text: #ffffff;
+  // Categorical colours for chart series, checked for colour-blind separation; series also differ
+  // by marker shape, so colour is never the only cue.
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
 
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
