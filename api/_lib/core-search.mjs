@@ -2,13 +2,17 @@
 // without a network lives here; api/core-search.mjs only creates the handler. Vercel does not turn
 // files under a folder starting with `_` into functions, so this module is only ever imported.
 
-/** The only upstream URL this proxy ever calls. Nothing from the request path reaches it. */
+/** The only upstream URLs this proxy ever calls. Nothing from the request path reaches them. */
 export const UPSTREAM_URL = 'https://api.core.ac.uk/v3/search/works/';
+export const UPSTREAM_AGGREGATE_URL = 'https://api.core.ac.uk/v3/search/works/aggregate';
 
 /** Below the app's 30 s per-attempt timeout, so the browser gets a clean 504 rather than giving up. */
 export const UPSTREAM_TIMEOUT_MS = 25_000;
 
 export const MAX_QUERY_STRING_LENGTH = 2_000;
+
+/** An aggregation body is a query and a field name or two; anything bigger is not from the app. */
+export const MAX_BODY_BYTES = 4_096;
 
 /** Mirrors CORE's own limits (see CORE_MAX_LIMIT and CORE_MAX_OFFSET in the app). */
 const MAX_LIMIT = 100;
@@ -23,6 +27,12 @@ export const ALLOWED_PARAMS = new Set(['q', 'limit', 'offset', 'exclude', 'sort'
  */
 const SEARCH_PATHS = new Set(['/core-api/v3/search/works/', '/api/core-search']);
 
+/** CORE only offers aggregation as a POST to this path, so the app sends the same. */
+const AGGREGATE_PATH = '/core-api/v3/search/works/aggregate';
+
+/** Fields the app aggregates on. CORE supports more; each one added here should be a choice. */
+export const ALLOWED_AGGREGATIONS = new Set(['yearPublished']);
+
 /** Vercel's CDN caches per full URL, query included; browsers do not see `s-maxage`. */
 export const SUCCESS_CACHE_CONTROL = 'public, s-maxage=300, stale-while-revalidate=600';
 export const NO_CACHE = 'no-store';
@@ -32,6 +42,11 @@ const JSON_TYPE = 'application/json; charset=utf-8';
 /** @param {string} pathname */
 export function isSearchPath(pathname) {
   return SEARCH_PATHS.has(pathname);
+}
+
+/** @param {string} pathname */
+export function isAggregatePath(pathname) {
+  return pathname === AGGREGATE_PATH;
 }
 
 /**
@@ -72,6 +87,65 @@ export function validateQuery(rawQuery) {
 }
 
 /**
+ * Checks an aggregation request body and rebuilds it from the allowed fields only, so nothing else
+ * the browser sends reaches CORE.
+ *
+ * @param {string} text
+ * @returns {{ ok: true, body: { q: string, aggregations: string[] } }
+ *   | { ok: false, status: number, error: string }}
+ */
+export function validateAggregateBody(text) {
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return { ok: false, status: 400, error: 'The body must be JSON.' };
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return { ok: false, status: 400, error: 'The body must be a JSON object.' };
+  }
+  const unknown = Object.keys(body).find((name) => name !== 'q' && name !== 'aggregations');
+  if (unknown) {
+    return { ok: false, status: 400, error: `Unsupported field: ${unknown}` };
+  }
+  const { q, aggregations } = body;
+  if (typeof q !== 'string' || !q.trim() || q.length > MAX_QUERY_STRING_LENGTH) {
+    return { ok: false, status: 400, error: 'q must be a non-empty string.' };
+  }
+  const valid =
+    Array.isArray(aggregations) &&
+    aggregations.length > 0 &&
+    new Set(aggregations).size === aggregations.length &&
+    aggregations.every((name) => ALLOWED_AGGREGATIONS.has(name));
+  if (!valid) {
+    const allowed = [...ALLOWED_AGGREGATIONS].join(', ');
+    return { ok: false, status: 400, error: `aggregations must list fields from: ${allowed}.` };
+  }
+  return { ok: true, body: { q, aggregations } };
+}
+
+/**
+ * Reads the request body, giving up once it passes `limit` bytes.
+ *
+ * @param {AsyncIterable<Buffer | string>} req
+ * @param {number} limit
+ * @returns {Promise<string | null>} null when the body is too large
+ */
+async function readBody(req, limit) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    const buffer = typeof chunk === 'string' ? Buffer.from(chunk) : chunk;
+    size += buffer.length;
+    if (size > limit) {
+      return null;
+    }
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+/**
  * Headers for the upstream request. Nothing is copied from the browser's request; the key comes
  * only from the server's environment.
  *
@@ -102,9 +176,14 @@ export function pickResponseHeaders(headers) {
   return picked;
 }
 
-/** @param {number} status */
-export function cacheControlFor(status) {
-  return status >= 200 && status < 300 ? SUCCESS_CACHE_CONTROL : NO_CACHE;
+/**
+ * Vercel's CDN only caches GET, so aggregation answers are never marked cacheable.
+ *
+ * @param {number} status
+ * @param {string} method
+ */
+export function cacheControlFor(status, method = 'GET') {
+  return method === 'GET' && status >= 200 && status < 300 ? SUCCESS_CACHE_CONTROL : NO_CACHE;
 }
 
 /**
@@ -170,26 +249,53 @@ export function createHandler({
     const pathname = new URL(rawUrl, 'http://localhost').pathname;
     const rawQuery = queryStart === -1 ? '' : rawUrl.slice(queryStart + 1);
 
-    if (!isSearchPath(pathname)) {
+    let upstreamUrl;
+    let upstreamBody;
+    if (isSearchPath(pathname)) {
+      if (req.method !== 'GET') {
+        return sendError(res, 405, 'Only GET is supported.', { allow: 'GET' });
+      }
+      const validation = validateQuery(rawQuery);
+      if (!validation.ok) {
+        return sendError(res, validation.status, validation.error);
+      }
+      upstreamUrl = `${UPSTREAM_URL}?${rawQuery}`;
+    } else if (isAggregatePath(pathname)) {
+      if (req.method !== 'POST') {
+        return sendError(res, 405, 'Only POST is supported.', { allow: 'POST' });
+      }
+      if (rawQuery) {
+        return sendError(res, 400, 'Send the aggregation in the body, not the URL.');
+      }
+      if (!/^application\/json\b/i.test(req.headers?.['content-type'] ?? '')) {
+        return sendError(res, 415, 'The body must be sent as application/json.');
+      }
+      const text = await readBody(req, MAX_BODY_BYTES);
+      if (text === null) {
+        return sendError(res, 413, 'The body is too large.');
+      }
+      const validation = validateAggregateBody(text);
+      if (!validation.ok) {
+        return sendError(res, validation.status, validation.error);
+      }
+      upstreamUrl = UPSTREAM_AGGREGATE_URL;
+      upstreamBody = JSON.stringify(validation.body);
+    } else {
       return sendError(res, 404, 'Not found.');
-    }
-    if (req.method !== 'GET') {
-      return sendError(res, 405, 'Only GET is supported.', { allow: 'GET' });
-    }
-    const validation = validateQuery(rawQuery);
-    if (!validation.ok) {
-      return sendError(res, validation.status, validation.error);
     }
 
     const apiKey = getApiKey();
     let upstream;
     let body;
     try {
-      upstream = await fetchImpl(`${UPSTREAM_URL}?${rawQuery}`, {
-        method: 'GET',
-        headers: buildUpstreamHeaders(apiKey),
-        // The URL is fixed and already has its trailing slash, so a redirect is unexpected; refusing
-        // it also means the Authorization header can never follow one.
+      upstream = await fetchImpl(upstreamUrl, {
+        method: req.method,
+        headers: upstreamBody
+          ? { ...buildUpstreamHeaders(apiKey), 'Content-Type': 'application/json' }
+          : buildUpstreamHeaders(apiKey),
+        body: upstreamBody,
+        // The URLs are fixed, so a redirect is unexpected; refusing it also means the
+        // Authorization header can never follow one.
         redirect: 'error',
         signal: AbortSignal.timeout(timeoutMs),
       });
@@ -212,7 +318,7 @@ export function createHandler({
     }
     send(res, upstream.status, redactKey(body, apiKey), {
       ...headers,
-      'cache-control': cacheControlFor(upstream.status),
+      'cache-control': cacheControlFor(upstream.status, req.method),
       // Says whether a key was configured, never the key itself; handy when checking a deployment.
       'x-core-auth': apiKey?.trim() ? 'key' : 'anonymous',
     });
