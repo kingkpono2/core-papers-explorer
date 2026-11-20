@@ -18,19 +18,17 @@ h1 {
   letter-spacing: -0.015em;
 }
 
-label {
-  display: block;
-  margin-bottom: var(--space-2);
-  font-weight: 600;
-}
-
-.search-form__row {
+.page-size {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
+
+  label {
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
 }
 
-input,
 select {
   min-height: 2.75rem;
   padding: var(--space-2) var(--space-3);
@@ -39,53 +37,11 @@ select {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius);
+  cursor: pointer;
   transition: border-color var(--transition-fast);
 
   &:hover {
     border-color: var(--color-text-muted);
-  }
-}
-
-input {
-  flex: 1 1 10rem;
-  min-width: 0;
-
-  &::placeholder {
-    color: var(--color-text-muted);
-  }
-}
-
-select {
-  cursor: pointer;
-}
-
-.button {
-  flex: 0 0 auto;
-}
-
-.search-form__footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-4);
-  margin-top: var(--space-3);
-}
-
-.hint {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
-.page-size {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-
-  label {
-    margin: 0;
-    font-size: var(--text-sm);
   }
 }
 

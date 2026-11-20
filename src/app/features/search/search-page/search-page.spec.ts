@@ -10,6 +10,7 @@ import { CoreApiService } from '../../../core/api/core-api.service';
 import { Paper, SearchResult } from '../../../core/models/paper';
 import { makePaper } from '../../../../testing/paper.fixture';
 import { PAGE_SIZE_STORAGE_KEY } from '../page-size-preference';
+import { RECENT_SEARCHES_STORAGE_KEY, RecentSearches } from '../recent-searches';
 import { SearchPage } from './search-page';
 
 const papers = (count: number, offset = 0): Paper[] =>
@@ -32,11 +33,12 @@ describe('SearchPage', () => {
 
   const stable = () => harness.fixture.whenStable();
   const url = () => TestBed.inject(Router).url;
-  const summary = () => el.querySelector('[aria-live="polite"]')?.textContent?.trim();
+  const summary = () => el.querySelector('.summary[aria-live="polite"]')?.textContent?.trim();
   const results = () => el.querySelector<HTMLElement>('section.results')!;
   const input = () => el.querySelector<HTMLInputElement>('input#query')!;
   const pageSize = () => el.querySelector<HTMLSelectElement>('select#page-size')!;
   const lastRequest = () => searchWorks.calls.mostRecent().args[0];
+  const recentQueries = () => TestBed.inject(RecentSearches).queries();
   const pageLink = (name: string) =>
     [...el.querySelectorAll<HTMLAnchorElement>('app-pagination a[href]')].find(
       (a) => a.textContent?.replace(/\s+/g, ' ').trim() === name,
@@ -85,6 +87,7 @@ describe('SearchPage', () => {
 
   beforeEach(() => {
     localStorage.removeItem(PAGE_SIZE_STORAGE_KEY);
+    localStorage.removeItem(RECENT_SEARCHES_STORAGE_KEY);
     responses = [];
     searchWorks = jasmine.createSpy('searchWorks').and.callFake(() => {
       const response = new Subject<SearchResult>();
@@ -102,15 +105,18 @@ describe('SearchPage', () => {
     });
   });
 
-  afterEach(() => localStorage.removeItem(PAGE_SIZE_STORAGE_KEY));
+  afterEach(() => {
+    localStorage.removeItem(PAGE_SIZE_STORAGE_KEY);
+    localStorage.removeItem(RECENT_SEARCHES_STORAGE_KEY);
+  });
 
   describe('search form', () => {
     beforeEach(() => open());
 
-    it('renders a labelled search field with an example boolean query', () => {
+    it('renders an empty, labelled search field with an example boolean query', () => {
       expect(input().labels?.[0]?.textContent).toContain('Keywords');
       expect(input().placeholder).toBe('(drone AND (package OR delivery))');
-      expect(input().value).toBe('drone');
+      expect(input().value).toBe('');
     });
 
     it('has a labelled page size control with presets up to 100', () => {
@@ -131,26 +137,62 @@ describe('SearchPage', () => {
       el.querySelector<HTMLButtonElement>('app-empty-state .chip')!.click();
       await stable();
 
+      // CORE ignores the inner OR group when the whole query is in brackets, so they are dropped.
       expect(searchWorks).toHaveBeenCalledOnceWith({
-        query: '(drone AND (package OR delivery))',
+        query: 'drone AND (package OR delivery)',
         limit: 10,
         offset: 0,
       });
       expect(input().value).toBe('(drone AND (package OR delivery))');
+      expect(url()).toBe('/?q=(drone%20AND%20(package%20OR%20delivery))&size=10');
     });
 
-    it('searches for the trimmed query and ignores a blank one', async () => {
+    it('searches for the normalised query and refuses a blank one', async () => {
       await submit('   ');
       expect(searchWorks).not.toHaveBeenCalled();
       expect(url()).toBe('/');
+      expect(el.querySelector('#query-problems')?.textContent).toContain(
+        'Enter something to search for.',
+      );
 
-      await submit('  robots  ');
-      expect(searchWorks).toHaveBeenCalledOnceWith({ query: 'robots', limit: 10, offset: 0 });
-      expect(url()).toBe('/?q=robots&size=10');
+      await submit('  robots   and  drones ');
+      expect(searchWorks).toHaveBeenCalledOnceWith({
+        query: 'robots and drones',
+        limit: 10,
+        offset: 0,
+      });
+      expect(url()).toBe('/?q=robots%20and%20drones&size=10');
+    });
+
+    it('does not send a query with errors', async () => {
+      await submit('drone AND (');
+
+      expect(searchWorks).not.toHaveBeenCalled();
+      expect(url()).toBe('/');
+      expect(input().getAttribute('aria-invalid')).toBe('true');
+    });
+
+    it('marks the query terms in the results', async () => {
+      await submit('drone NOT military');
+      await respond(
+        resultOf(1, [makePaper({ title: 'Military drone delivery', abstract: 'Drones at sea.' })]),
+      );
+
+      const marks = [...el.querySelectorAll('app-paper-card mark')].map((m) => m.textContent);
+      expect(marks).toEqual(['drone', 'Drones']);
+    });
+
+    it('remembers successful searches', async () => {
+      await submit('robots');
+      expect(recentQueries()).toEqual([]);
+
+      await respond(resultOf(1, papers(1)));
+      expect(recentQueries()).toEqual(['robots']);
+      expect(el.querySelector('.recent')?.textContent).toContain('robots');
     });
 
     it('shows skeleton cards while loading', async () => {
-      await submit();
+      await submit('drone');
 
       expect(el.querySelectorAll('app-skeleton-card').length).toBe(3);
       expect(results().getAttribute('aria-busy')).toBe('true');
@@ -158,7 +200,7 @@ describe('SearchPage', () => {
     });
 
     it('lists the papers, announces the range and total and focuses the results heading', async () => {
-      await submit();
+      await submit('drone');
       await respond(
         resultOf(71213, [makePaper({ id: '1', title: 'Drone delivery' }), ...papers(9, 1)]),
       );
@@ -234,6 +276,16 @@ describe('SearchPage', () => {
 
       expect(searchWorks).toHaveBeenCalledTimes(2);
       expect(url()).toBe('/?q=drone&size=10');
+    });
+
+    it('sends nothing for a link with an invalid query and explains why', async () => {
+      await open('/?q=drone%20AND%20(&size=10');
+
+      expect(searchWorks).not.toHaveBeenCalled();
+      expect(results().textContent).toContain('so it was not sent to CORE');
+      expect(el.querySelector('#query-problems')?.textContent).toContain(
+        'This bracket is never closed.',
+      );
     });
 
     it('sends a single request when opening a link that needs repairing', async () => {

@@ -1,0 +1,86 @@
+<form class="search-form" role="search" novalidate (submit)="submit($event)">
+  <label for="query">Keywords</label>
+  <div class="row">
+    <input
+      #queryInput
+      id="query"
+      type="search"
+      name="query"
+      autocomplete="off"
+      spellcheck="false"
+      aria-describedby="query-problems query-hint"
+      [attr.aria-invalid]="invalid() || null"
+      [placeholder]="placeholder"
+      [value]="text()"
+      (input)="edit(queryInput.value)"
+      (keydown.escape)="clear($event)"
+    />
+    <button type="submit" class="button">Search</button>
+  </div>
+
+  <div id="query-problems" class="problems" aria-live="polite">
+    @for (problem of problems(); track problem.code + problem.start) {
+      <p class="problem" [class.problem--error]="problem.severity === 'error'">
+        <span class="problem__message"
+          ><strong class="problem__label">{{
+            problem.severity === 'error' ? 'Error:' : 'Warning:'
+          }}</strong>
+          {{ problem.message }}</span
+        >
+        @if (problem.excerpt; as excerpt) {
+          <button
+            type="button"
+            class="problem__excerpt"
+            [attr.aria-label]="'Select “' + excerpt.text + '” in the search box'"
+            (click)="select(problem)"
+          >
+            <code
+              >{{ excerpt.before }}<mark>{{ excerpt.text }}</mark
+              >{{ excerpt.after }}</code
+            >
+          </button>
+        }
+      </p>
+    }
+  </div>
+
+  <div class="meta">
+    <p id="query-hint" class="hint">Combine terms with AND, OR, NOT and brackets.</p>
+    <ng-content />
+    <!-- Last in the row, so the panel it opens comes next in the tab order. -->
+    <button
+      #helpToggle
+      type="button"
+      class="help-toggle"
+      aria-controls="search-help"
+      [attr.aria-expanded]="helpOpen()"
+      (click)="helpOpen.set(!helpOpen())"
+    >
+      How to search
+    </button>
+  </div>
+
+  <div id="search-help" class="help" [hidden]="!helpOpen()">
+    <app-search-help
+      (exampleSelected)="runExample($event)"
+      (fieldSelected)="insert($event)"
+      (closed)="closeHelp()"
+    />
+  </div>
+
+  @if (recent.queries().length) {
+    <div class="recent">
+      <p id="recent-label" class="recent__label">Recent searches</p>
+      <ul class="recent__list" aria-labelledby="recent-label">
+        @for (query of recent.queries(); track query) {
+          <li>
+            <button type="button" class="chip recent__chip" [title]="query" (click)="run(query)">
+              {{ query }}
+            </button>
+          </li>
+        }
+      </ul>
+      <button type="button" class="link-button" (click)="clearHistory()">Clear history</button>
+    </div>
+  }
+</form>

@@ -8,7 +8,7 @@ import {
   computed,
   effect,
   inject,
-  linkedSignal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -24,6 +24,10 @@ import { PaperCard } from '../../../shared/ui/paper-card/paper-card';
 import { SkeletonCard } from '../../../shared/ui/skeleton-card/skeleton-card';
 import { PageSizePreference } from '../page-size-preference';
 import { MAX_RESULTS, lastPage, pageOffset, resultRange } from '../paging';
+import { toCoreQuery } from '../query/core-query';
+import { analyseQuery, positiveTerms } from '../query/query-analyser';
+import { RecentSearches } from '../recent-searches';
+import { SearchBar } from '../search-bar/search-bar';
 import {
   DEFAULT_PAGE_SIZE,
   PAGE_SIZES,
@@ -36,16 +40,25 @@ import {
 
 type SearchState =
   | { status: 'idle' }
+  | { status: 'invalid'; params: SearchParams }
   | { status: 'loading'; params: SearchParams }
   | { status: 'success'; params: SearchParams; result: SearchResult }
   | { status: 'error'; params: SearchParams; error: ApiError };
 
-const DEFAULT_QUERY = 'drone';
 const SKELETON_COUNT = 3;
 
 @Component({
   selector: 'app-search-page',
-  imports: [DecimalPipe, EmptyState, ErrorState, Pagination, PaperCard, RouterLink, SkeletonCard],
+  imports: [
+    DecimalPipe,
+    EmptyState,
+    ErrorState,
+    Pagination,
+    PaperCard,
+    RouterLink,
+    SearchBar,
+    SkeletonCard,
+  ],
   templateUrl: './search-page.html',
   styleUrl: './search-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -55,14 +68,14 @@ export class SearchPage {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly pageSizePreference = inject(PageSizePreference);
+  private readonly recentSearches = inject(RecentSearches);
   private readonly numbers = new Intl.NumberFormat(inject(LOCALE_ID));
   private readonly reloads = new Subject<void>();
   private readonly queryParamMap = toSignal(this.route.queryParamMap, { requireSync: true });
   private readonly resultsHeading = viewChild.required<ElementRef<HTMLElement>>('resultsHeading');
 
-  protected readonly exampleQuery = '(drone AND (package OR delivery))';
   protected readonly examples = [
-    this.exampleQuery,
+    '(drone AND (package OR delivery))',
     'renewable energy AND storage',
     'coral reef bleaching',
   ];
@@ -79,18 +92,27 @@ export class SearchPage {
     { equal: sameSearch },
   );
 
-  /** The text in the search box; follows the URL on Back/Forward but can be edited freely. */
-  protected readonly query = linkedSignal(() => this.params().query || DEFAULT_QUERY);
-
-  // switchMap unsubscribes from the previous search, which aborts its HTTP request.
+  // switchMap unsubscribes from the previous search, which aborts its HTTP request. A query with
+  // errors (from a hand-edited or old link) is never sent; the search bar explains what is wrong.
   protected readonly state = toSignal<SearchState, SearchState>(
     merge(toObservable(this.params), this.reloads.pipe(map(() => this.params()))).pipe(
-      switchMap((params) =>
-        params.query ? this.load(params) : of<SearchState>({ status: 'idle' }),
-      ),
+      switchMap((params) => {
+        if (!params.query) {
+          return of<SearchState>({ status: 'idle' });
+        }
+        return analyseQuery(params.query).hasErrors
+          ? of<SearchState>({ status: 'invalid', params })
+          : this.load(params);
+      }),
     ),
     { initialValue: { status: 'idle' } },
   );
+
+  /** Words from the query that was searched, to mark in titles and abstracts. */
+  protected readonly highlightTerms = computed(() => {
+    const state = this.state();
+    return state.status === 'success' ? positiveTerms(analyseQuery(state.params.query).ast) : [];
+  });
 
   protected readonly paging = computed(() => {
     const state = this.state();
@@ -139,6 +161,13 @@ export class SearchPage {
       });
     });
 
+    effect(() => {
+      const state = this.state();
+      if (state.status === 'success') {
+        untracked(() => this.recentSearches.add(state.params.query));
+      }
+    });
+
     // Once a search settles, move focus to the results so keyboard and screen reader users land
     // there. Focusing also scrolls the heading into view after a page change.
     afterRenderEffect(() => {
@@ -147,11 +176,6 @@ export class SearchPage {
         this.resultsHeading().nativeElement.focus();
       }
     });
-  }
-
-  protected search(event: Event): void {
-    event.preventDefault();
-    this.searchFor(this.query());
   }
 
   protected searchFor(query: string): void {
@@ -185,7 +209,8 @@ export class SearchPage {
 
   private load(params: SearchParams): Observable<SearchState> {
     const { query, page, size } = params;
-    return this.api.searchWorks({ query, limit: size, offset: pageOffset(page, size) }).pipe(
+    const request = { query: toCoreQuery(query), limit: size, offset: pageOffset(page, size) };
+    return this.api.searchWorks(request).pipe(
       map((result): SearchState => ({ status: 'success', params, result })),
       catchError((error: unknown) =>
         of<SearchState>({ status: 'error', params, error: toApiError(error) }),
