@@ -1,0 +1,110 @@
+:host {
+  position: relative;
+  display: block;
+  min-height: 220px;
+}
+
+.chart {
+  display: block;
+  overflow: visible;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.grid {
+  stroke: var(--color-border);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+
+  &--base {
+    stroke: var(--color-border-strong);
+  }
+}
+
+.tick,
+.label {
+  fill: var(--color-text-muted);
+}
+
+.tick {
+  text-anchor: end;
+}
+
+.label {
+  text-anchor: middle;
+}
+
+.peak {
+  fill: var(--color-text);
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.band {
+  fill: transparent;
+}
+
+.bar {
+  fill: var(--color-primary);
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: grow 450ms ease-out both;
+}
+
+.is-active {
+  .band {
+    fill: var(--color-primary-soft);
+  }
+
+  .bar {
+    fill: var(--color-primary-hover);
+  }
+
+  .label {
+    fill: var(--color-text);
+  }
+}
+
+.hit {
+  fill: transparent;
+
+  &--selectable {
+    cursor: pointer;
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    stroke: var(--color-focus);
+    stroke-width: 2;
+  }
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 1;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-surface);
+  background: var(--color-text);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+}
+
+@keyframes grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: none;
+  }
+}
