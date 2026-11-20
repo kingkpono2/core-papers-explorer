@@ -1,0 +1,272 @@
+:host {
+  display: block;
+  position: relative;
+  // The sky's own colour, for the ring that keeps overlapping stars apart and the name halos.
+  --sky: #0b1222;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  font-size: 13px;
+}
+
+.backdrop {
+  fill: transparent;
+}
+
+.dust {
+  fill: #dfe7f7;
+  opacity: 0.35;
+
+  &--1 {
+    opacity: 0.5;
+    animation: shimmer 5s ease-in-out infinite alternate;
+  }
+
+  &--2 {
+    opacity: 0.22;
+    animation: shimmer 7s ease-in-out -3s infinite alternate-reverse;
+  }
+}
+
+.nebula {
+  transition: opacity 0.6s ease;
+}
+
+.constellation {
+  fill: none;
+  stroke-width: 1;
+  stroke-opacity: 0.35;
+  stroke-linecap: round;
+  transition: stroke-opacity 0.3s ease;
+
+  &.is-selected {
+    stroke-opacity: 0.75;
+  }
+}
+
+.is-dimmed {
+  opacity: 0.16;
+}
+
+.nebula.is-dimmed {
+  opacity: 0.1 !important;
+}
+
+.star {
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+
+  &:focus {
+    outline: none;
+  }
+
+  &.is-hidden {
+    pointer-events: none;
+  }
+}
+
+.star__hit {
+  fill: transparent;
+}
+
+// Stars grow in from a point as the time-lapse reaches their year.
+.star__body {
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  .is-hidden & {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+
+  .is-new & {
+    animation: flare 1s ease-out;
+  }
+}
+
+// A ring in the sky's colour keeps overlapping stars apart.
+.star__shape {
+  stroke: var(--sky);
+  stroke-width: 1.5;
+  paint-order: stroke;
+  transition: transform 0.15s ease;
+
+  .star:hover &,
+  .star:focus-visible & {
+    transform: scale(1.35);
+  }
+}
+
+.star__glow {
+  animation: twinkle 3.6s ease-in-out infinite alternate;
+}
+
+.star__ring {
+  fill: none;
+  stroke: var(--color-focus);
+  stroke-width: 2;
+  opacity: 0;
+
+  .star:focus-visible & {
+    opacity: 1;
+  }
+}
+
+.label {
+  cursor: pointer;
+  transition: opacity 0.5s ease;
+
+  &.is-hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &.is-dimmed {
+    opacity: 0.35;
+  }
+}
+
+.label__hit {
+  fill: rgb(11 18 34 / 55%);
+}
+
+.label__text {
+  font-weight: 600;
+  fill: var(--color-text);
+  stroke: var(--sky);
+  stroke-width: 3px;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+
+.label__glyph {
+  stroke: var(--sky);
+  stroke-width: 1;
+}
+
+.counter {
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-2);
+  margin: 0;
+  pointer-events: none;
+}
+
+.counter__year {
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--color-text);
+  opacity: 0.85;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 2;
+  width: max-content;
+  max-width: min(18rem, 70%);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: #121b30;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  transform: translate(14px, calc(-100% - 10px));
+
+  &--left {
+    transform: translate(calc(-100% - 14px), calc(-100% - 10px));
+  }
+
+  &--below {
+    transform: translate(14px, 14px);
+  }
+
+  &--left.tooltip--below {
+    transform: translate(calc(-100% - 14px), 14px);
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.tooltip__title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-weight: 650;
+  line-height: var(--leading-tight);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.tooltip__meta {
+  margin-top: var(--space-1) !important;
+  color: var(--color-text-muted);
+}
+
+.tooltip__topic {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1) !important;
+}
+
+.tooltip__glyph {
+  flex-shrink: 0;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+@keyframes twinkle {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  to {
+    opacity: 0.12;
+  }
+}
+
+@keyframes flare {
+  from {
+    filter: brightness(2.2);
+  }
+}
+
+@mixin still {
+  .star__body,
+  .star__shape,
+  .nebula,
+  .label,
+  .star,
+  .constellation {
+    transition: none;
+  }
+
+  .star__glow,
+  .dust,
+  .is-new .star__body {
+    animation: none;
+  }
+}
+
+:host(.still) {
+  @include still;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @include still;
+}

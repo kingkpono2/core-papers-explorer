@@ -16,7 +16,7 @@
       (input)="edit(queryInput.value)"
       (keydown.escape)="clear($event)"
     />
-    <button type="submit" class="button">Search</button>
+    <button type="submit" class="button">{{ action() }}</button>
   </div>
 
   <div id="query-problems" class="problems" aria-live="polite">

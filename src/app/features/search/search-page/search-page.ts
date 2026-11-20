@@ -23,6 +23,7 @@ import { ErrorState } from '../../../shared/ui/error-state/error-state';
 import { Pagination } from '../../../shared/ui/pagination/pagination';
 import { PaperCard } from '../../../shared/ui/paper-card/paper-card';
 import { SkeletonCard } from '../../../shared/ui/skeleton-card/skeleton-card';
+import { ViewSwitch } from '../../../shared/ui/view-switch/view-switch';
 import { ChartSearch, YearChart } from '../chart/year-chart/year-chart';
 import { ExportMenu } from '../export/export-menu/export-menu';
 import { PageSizePreference } from '../page-size-preference';
@@ -68,6 +69,7 @@ const SKELETON_COUNT = 3;
     SearchBar,
     ShareLink,
     SkeletonCard,
+    ViewSwitch,
     YearChart,
   ],
   templateUrl: './search-page.html',

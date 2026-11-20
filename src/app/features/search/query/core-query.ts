@@ -61,13 +61,43 @@ export function coreQueryAdjustment(
  * by year are left alone.
  */
 export function narrowQuery(query: string, clause: string): string | null {
+  const { ast } = analyseQuery(toCoreQuery(query));
+  return !ast || mentionsField(ast, 'yearPublished') ? null : refineQuery(query, clause);
+}
+
+/**
+ * The query with `clause` added by AND, in the form CORE reads correctly, or null when that cannot
+ * be done without changing what the query means. As `narrowQuery`, without its year check: it
+ * starts from the CORE form, brackets a query that is an OR at the top, and refuses when that
+ * would push an OR group into nested brackets, which CORE ignores. The clause itself stays at the
+ * top level, so an OR group in it is read correctly.
+ */
+export function refineQuery(query: string, clause: string): string | null {
   const core = toCoreQuery(query);
   const { ast } = analyseQuery(core);
-  if (!ast || mentionsField(ast, 'yearPublished')) {
+  if (!ast) {
     return null;
   }
-  const narrowed = ast.kind === 'or' ? `(${core}) AND ${clause}` : `${core} AND ${clause}`;
-  return nestedOrGroups(narrowed) > nestedOrGroups(core) ? null : narrowed;
+  const refined = ast.kind === 'or' ? `(${core}) AND ${clause}` : `${core} AND ${clause}`;
+  return nestedOrGroups(refined) > nestedOrGroups(core) ? null : refined;
+}
+
+/**
+ * A clause matching any of `terms`, such as `(parcel OR "last mile")`: words as they are, phrases
+ * in quotes, joined by OR and bracketed when there are several. Only plain lower-case words are
+ * used, so nothing in a term can be read as query syntax; null when none is left.
+ */
+export function anyOfClause(terms: readonly string[]): string | null {
+  const words = new Set(
+    terms
+      .map((term) => term.trim().toLowerCase().replace(/\s+/g, ' '))
+      .filter((term) => /^[a-z0-9]+( [a-z0-9]+)*$/.test(term) && !/^(and|or|not)$/.test(term)),
+  );
+  const parts = [...words].map((term) => (term.includes(' ') ? `"${term}"` : term));
+  if (!parts.length) {
+    return null;
+  }
+  return parts.length === 1 ? parts[0] : `(${parts.join(' OR ')})`;
 }
 
 function nestedOrGroups(query: string): number {

@@ -11,10 +11,18 @@ const NAMED_ENTITIES: Record<string, string> = {
   quot: '"',
   apos: "'",
   nbsp: ' ',
+  ndash: '–',
+  mdash: '—',
+  lsquo: '‘',
+  rsquo: '’',
+  ldquo: '“',
+  rdquo: '”',
+  hellip: '…',
 };
 
 // Some providers send abstracts as escaped HTML, sometimes without the final semicolon.
-const ENTITY = /&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);?/gi;
+const ENTITY =
+  /&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos|nbsp|ndash|mdash|[lr]squo|[lr]dquo|hellip);?/gi;
 const TAG = /<\/?[a-z][^<>]*>/gi;
 // Truncated abstracts can end in half a tag, such as `</p` or `<jats:p`, with no closing `>`.
 const TRAILING_TAG_FRAGMENT = /<\/?[a-z][\w:.-]*\s*$/i;

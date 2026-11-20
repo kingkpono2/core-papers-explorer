@@ -98,6 +98,12 @@ describe('paper mapper', () => {
       expect(cleanText('Text.</p  \n')).toBe('Text.');
     });
 
+    it('decodes the dashes and quotes some providers send as entities', () => {
+      expect(cleanText('Vehicle&ndash;Drone routing &mdash; a &ldquo;review&rdquo;&hellip;')).toBe(
+        'Vehicle–Drone routing — a “review”…',
+      );
+    });
+
     it('keeps comparison operators that are not tags', () => {
       expect(cleanText('p &lt; 0.05 and q &gt; 1')).toBe('p < 0.05 and q > 1');
       expect(cleanText('true when a < b')).toBe('true when a < b');

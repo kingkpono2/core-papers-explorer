@@ -1,0 +1,98 @@
+<ul class="topics" aria-label="Topics">
+  @for (item of items(); track $index; let i = $index) {
+    <li>
+      <button
+        type="button"
+        class="topic"
+        [class.is-dimmed]="selected() !== null && selected() !== i"
+        [attr.aria-pressed]="selected() === i"
+        (click)="toggle(i)"
+      >
+        <svg class="topic__swatch" viewBox="-8 -8 16 16" aria-hidden="true" focusable="false">
+          <path [attr.d]="item.swatch" [attr.fill]="item.colour" />
+        </svg>
+        <span class="topic__name">
+          {{ item.topic.label }}
+          <span class="visually-hidden">({{ item.shape }})</span>
+        </span>
+        <span class="topic__count">
+          {{ counts()[i] }}<span class="visually-hidden"> of {{ item.topic.size }} papers</span>
+        </span>
+        <span class="topic__growth">
+          @if (item.share !== null) {
+            {{ item.share }}% since {{ highlights().since }}
+          }
+          @if (highlights().fastestGrowing === i) {
+            <span class="badge">Fastest-growing</span>
+          } @else if (highlights().mostEstablished === i) {
+            <span class="badge badge--quiet">Most established</span>
+          }
+        </span>
+      </button>
+    </li>
+  }
+</ul>
+
+@if (detail(); as d) {
+  <section class="detail" aria-labelledby="galaxy-topic-heading">
+    <h3 id="galaxy-topic-heading">
+      <svg class="topic__swatch" viewBox="-8 -8 16 16" aria-hidden="true" focusable="false">
+        <path [attr.d]="items()[d.index].swatch" [attr.fill]="items()[d.index].colour" />
+      </svg>
+      {{ d.topic.label }}
+    </h3>
+    <p class="detail__stats">
+      {{ d.topic.size }} {{ d.topic.size === 1 ? 'paper' : 'papers' }}
+      @if (d.topic.medianYear) {
+        · median year {{ d.topic.medianYear }}
+      }
+      @if (d.share !== null) {
+        · {{ d.share }}% published since {{ highlights().since }}
+      }
+    </p>
+    @if (d.topic.terms.length) {
+      <p class="detail__terms">
+        Words that set it apart:
+        @for (term of d.topic.terms; track term) {
+          <span class="term">{{ term }}</span>
+        }
+      </p>
+    }
+    <p class="detail__label">Most typical papers</p>
+    <ol class="detail__papers">
+      @for (paper of d.typical; track paper.id) {
+        <li>
+          <a [href]="paper.sourceUrl" target="_blank" rel="noopener noreferrer"
+            >{{ paper.title }}<span class="visually-hidden"> (opens in a new tab)</span></a
+          >
+          @if (paper.year) {
+            <span class="detail__year">{{ paper.year }}</span>
+          }
+        </li>
+      }
+    </ol>
+    <div class="detail__actions">
+      @if (d.search; as search) {
+        <a class="button button--small" routerLink="/" [queryParams]="{ q: search }"
+          >Search this topic</a
+        >
+      }
+      <button
+        type="button"
+        class="button button--secondary button--small"
+        (click)="selectedChange.emit(null)"
+      >
+        Show all topics
+      </button>
+    </div>
+    @if (d.search; as search) {
+      <p class="detail__query">
+        Searches for <code>{{ search }}</code>
+      </p>
+    } @else {
+      <p class="detail__query">
+        This search cannot be narrowed to the topic without CORE ignoring part of it.
+      </p>
+    }
+  </section>
+}

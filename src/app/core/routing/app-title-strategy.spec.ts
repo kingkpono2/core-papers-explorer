@@ -41,6 +41,11 @@ describe('AppTitleStrategy', () => {
     expect(title()).toBe('Compare trends — CORE Papers Explorer');
   });
 
+  it('names the Galaxy with the query it maps', async () => {
+    await router.navigateByUrl('/galaxy?q=drone%20AND%20delivery');
+    expect(title()).toBe('drone AND delivery — Research galaxy — CORE Papers Explorer');
+  });
+
   it('sends unknown paths to the search page', async () => {
     await router.navigateByUrl('/no/such/page');
 

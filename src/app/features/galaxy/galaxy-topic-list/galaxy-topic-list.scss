@@ -1,0 +1,48 @@
+:host {
+  display: block;
+  margin-top: var(--space-4);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.group__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-base);
+}
+
+.swatch {
+  width: 1rem;
+  height: 1rem;
+}
+
+.group__count {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.group__stats {
+  margin: var(--space-1) 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.papers {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-6);
+  font-size: var(--text-sm);
+}
+
+.papers__year {
+  margin-left: var(--space-2);
+  color: var(--color-text-muted);
+}

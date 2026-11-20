@@ -41,6 +41,8 @@ interface Problem extends Diagnostic {
 export class SearchBar {
   /** The query in the URL. */
   readonly query = input('');
+  /** The text of the submit button. */
+  readonly action = input('Search');
   readonly searched = output<string>();
 
   private readonly recent = inject(RecentSearches);

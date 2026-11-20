@@ -33,6 +33,15 @@
       </span>
     </li>
     <li>
+      <a class="tour__action" routerLink="/galaxy" [queryParams]="{ q: example }"
+        >Open the Galaxy and press Play</a
+      >
+      <span class="tour__detail">
+        The brief’s example as topics: its 100 most relevant papers, grouped in a background thread
+        and drawn as a night sky that fills in year by year.
+      </span>
+    </li>
+    <li>
       <button type="button" class="tour__action" (click)="helpRequested.emit()">
         See how queries are checked
       </button>
