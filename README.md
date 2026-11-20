@@ -21,6 +21,12 @@ Live demo: https://core-papers-explorer.vercel.app
   with plain-language insight worked out in the browser: size, peak year and growth to the last
   full year. With real data it finds that `drone AND delivery` grew 13× from 2015 to 2025, against
   4.5× for `autonomous AND vehicles` (see [Compare trends](#compare-trends)).
+- **Research Galaxy: the topics inside a search, found in the browser.** The 100 most relevant
+  papers are grouped into topics with TF-IDF and spherical k-means in a web worker (about 120 ms,
+  no server, no model), named by the words particular to each, and drawn as a night sky that
+  fills in year by year. For the brief's example it finds three topics and that "last mile ·
+  logistics" is growing fastest, with 73% of its papers since 2023 (see
+  [Research Galaxy](#research-galaxy)).
 
 ### Reviewer quick tour (60 seconds)
 
@@ -29,12 +35,15 @@ Live demo: https://core-papers-explorer.vercel.app
    The note by the result count says what was sent to CORE and why; "Why?" explains the quirk.
 2. [Compare research trends](https://core-papers-explorer.vercel.app/compare?q=drone%20AND%20delivery&q=autonomous%20AND%20vehicles):
    two queries in one chart, with their growth compared in a sentence; try "Relative to each peak".
-3. Back on a search, click a bar in "Publication years" to search that year only (2020 gives 354
+3. [Open the Galaxy and press Play](<https://core-papers-explorer.vercel.app/galaxy?q=(drone%20AND%20(package%20OR%20delivery))>):
+   the brief's example as three topics; watch them form year by year, hover a star, then choose
+   "last mile · logistics" in the legend and "Search this topic".
+4. Back on a search, click a bar in "Publication years" to search that year only (2020 gives 354
    papers, the bar's height), or press "Show as table".
-4. Open "How to search", or try a broken query such as
+5. Open "How to search", or try a broken query such as
    [`Title:drone AND (`](https://core-papers-explorer.vercel.app/?q=Title:drone%20AND%20%28): the
    mistakes are explained under the box and nothing is sent to CORE.
-5. Press "Export" above the results for CSV or BibTeX of the page, and the theme switch in the
+6. Press "Export" above the results for CSV or BibTeX of the page, and the theme switch in the
    header for dark mode.
 
 The start screen offers the same tour as one-click steps.
@@ -90,6 +99,15 @@ Compare trends
   charts two or three queries together over the last 15 years, as counts or relative to each
   query's peak, with a table view (see [Compare trends](#compare-trends))
 
+Research Galaxy
+
+- A Galaxy view of any search (`/galaxy?q=...`, from the header or the Results and Galaxy switch
+  above the results) that groups its 100 most relevant papers into topics in a web worker and
+  draws them as a night sky, with a time-lapse by year, each topic's growth, highlighting and
+  "Search this topic", keyboard navigation and a list view (see
+  [Research Galaxy](#research-galaxy))
+- Duplicate records of the same paper, which CORE returns once per repository, are merged first
+
 Speed and resilience
 
 - Pages seen in the last five minutes are kept in memory, so Back, Forward and revisiting a page
@@ -118,7 +136,7 @@ Engineering
 - A Vercel function in front of CORE that keeps the API key on the server, lets the CDN cache
   searches for five minutes and only allows the two endpoints the app uses (see
   [Deployment](#deployment))
-- 404 unit tests (Karma) and 34 tests for the serverless function (`node --test`), run with lint,
+- 535 unit tests (Karma) and 34 tests for the serverless function (`node --test`), run with lint,
   format check and a production build on every push by GitHub Actions
 - Deployed on Vercel with preview deployments for branches
 
@@ -243,6 +261,40 @@ of November 2026:
 
 The examples use `AND` on purpose: CORE joins plain words with OR, so `drone delivery` would count
 every paper that mentions either word.
+
+## Research Galaxy
+
+The Galaxy answers "what is inside this search?". It asks CORE once for the 100 most relevant
+papers (through the same results cache and bracket fix as the search page), merges CORE's duplicate
+records, and hands the rest to a web worker, so the page never stalls:
+
+- **Words.** Title (counted twice) and abstract, lower-cased, without HTML, stop words, academic
+  filler ("this paper proposes a novel approach") or the words of the query, lightly stemmed, plus
+  word pairs that recur, such as "last mile".
+- **Topics.** TF-IDF vectors (sublinear term frequency, smoothed inverse document frequency, unit
+  length) clustered by cosine similarity with spherical k-means, seeded k-means++ so the same search
+  always draws the same map. It tries 3 to 8 topics and keeps the number with the best mean
+  silhouette; each topic is named by its most distinctive terms (c-TF-IDF) and measured by its
+  median year and its share of papers from the last three years.
+- **Sky.** A small seeded force simulation (no d3) links each paper to its five most similar ones
+  and pulls each topic to its own point on an ellipse, in an order that never puts two hard-to-tell
+  colours side by side. All of this takes about 120 ms for 100 papers in the browser, and is drawn
+  as SVG: colour and shape per topic (a colour-blind-checked palette that stays on a dark sky in
+  both themes), size and glow for recent papers, constellation lines and a name per topic.
+
+Play reveals the papers year by year with the legend counting along, then sums the map up:
+
+> 3 topics · fastest-growing: last mile · logistics (73% of its papers since 2023) · most
+> established: autonomous · aerial (median year 2021)
+
+That is the brief's example with real data (82 papers once 18 duplicates are merged: autonomous ·
+aerial 37, truck · algorithm 29, last mile · logistics 16). `drone AND delivery` gives five topics,
+from truck routing algorithms to healthcare deliveries. Choosing a topic highlights it and offers
+"Search this topic", which narrows the query as CORE reads it, such as
+`drone AND (package OR delivery) AND (truck OR algorithm)`, and never nests an OR group that CORE
+would ignore. Stars are links to the papers and a single tab stop moved with the arrow keys
+(within the chosen topic, if there is one); a list view gives the same topics and papers as text,
+and reduced motion turns the time-lapse into a jump to the end.
 
 ## Tech stack
 
@@ -402,6 +454,10 @@ src/
       theme/           the saved light or dark theme
     features/
       compare/         the Compare page (lazy loaded), its URL params, loading and trend insights
+      galaxy/          the Galaxy page (lazy loaded), the night sky, its legend and list view, the
+                       worker and the service that runs it, duplicate merging, label placement
+        analysis/      pure topic finding and layout: words, TF-IDF, k-means, silhouette, c-TF-IDF
+                       names, topic statistics and the force simulation
       search/          the search page (lazy loaded), search bar, help panel, URL params, paging
                        maths, page size preference, recent searches, results cache, share button
         query/         query analyser (tokenizer, parser, diagnostics) and the CORE workarounds
@@ -409,7 +465,8 @@ src/
         export/        CSV and BibTeX export and the Export menu
     shared/
       ui/              presentational components: paper card, skeleton, empty and error states,
-                       pagination, term highlighting, bar chart, line chart
+                       pagination, term highlighting, bar chart, line chart, Results and Galaxy
+                       switch
     app.config.ts      application providers
     app.routes.ts      routes
   environments/        build-time configuration, including the optional API key
