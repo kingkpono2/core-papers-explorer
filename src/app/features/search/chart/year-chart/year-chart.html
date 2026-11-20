@@ -1,0 +1,115 @@
+@let current = view();
+<section
+  class="panel"
+  aria-labelledby="year-chart-heading"
+  [attr.aria-busy]="current.status === 'loading'"
+>
+  <header class="header">
+    <h2 id="year-chart-heading">Publication years</h2>
+    @if (current.status === 'success') {
+      <button
+        type="button"
+        class="toggle"
+        [attr.aria-pressed]="showTable()"
+        (click)="showTable.set(!showTable())"
+      >
+        Show as table
+      </button>
+    }
+  </header>
+
+  @switch (current.status) {
+    @case ('blank') {
+      <div class="frame" aria-hidden="true"></div>
+      <p class="message">Search to see when the matching papers were published.</p>
+    }
+    @case ('loading') {
+      <p class="visually-hidden">Counting papers per year…</p>
+      <div class="skeleton" aria-hidden="true">
+        @for (height of skeleton; track $index) {
+          <span class="skeleton__bar" [style.height.%]="height"></span>
+        }
+      </div>
+    }
+    @case ('empty') {
+      <div class="frame" aria-hidden="true"></div>
+      <p class="message">No matching papers have a publication year to chart.</p>
+    }
+    @case ('error') {
+      <div class="error" role="alert">
+        <p class="message">The chart could not be loaded. {{ current.error.message }}</p>
+        @if (current.error.kind !== 'bad-query') {
+          <button type="button" class="button button--secondary" (click)="reload()">Retry</button>
+        }
+      </div>
+    }
+    @case ('success') {
+      <p class="caption">
+        All {{ current.total ? current.total + ' ' : '' }}matching papers by year of publication,
+        not only those on this page. Counts come from CORE.
+      </p>
+
+      @if (showTable()) {
+        <div class="table-wrap">
+          <table class="table">
+            <caption class="visually-hidden">
+              Matching papers per publication year
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Year</th>
+                <th scope="col">Papers</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of current.rows; track row.label) {
+                <tr>
+                  <th scope="row">{{ row.label }}</th>
+                  <td>{{ row.count }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <app-bar-chart
+          [bars]="current.bars"
+          label="Matching papers per publication year"
+          [selectable]="selectable()"
+          (selected)="selectYear($event)"
+        />
+      }
+
+      <ul class="notes">
+        @if (selectable() && !showTable()) {
+          <li>Select a bar to search that year only.</li>
+        }
+        @if (current.partial) {
+          <li>{{ current.partial }} is the year so far.</li>
+        }
+        @if (current.earlier; as earlier) {
+          <li>
+            {{ earlier.text }} from before {{ earlier.before }} are not drawn.
+            @if (selectable()) {
+              <button
+                type="button"
+                class="link"
+                (click)="narrow('yearPublished<' + earlier.before)"
+              >
+                Search them
+              </button>
+            }
+          </li>
+        }
+        @if (current.undated) {
+          <li>
+            {{ current.undated }} without a usable publication year{{
+              current.truncated ? ', or from years too sparse for CORE to list,' : ''
+            }}
+            are not counted.
+          </li>
+        }
+      </ul>
+    }
+  }
+</section>

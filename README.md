@@ -23,6 +23,9 @@ charts how all matching papers are distributed over time.
   and buttons that insert a field at the cursor
 - The last eight searches are kept as one-click chips, with a button to clear them
 - Search terms are highlighted in titles and abstracts
+- A chart of when all matching papers were published, not only the ones on the page, with
+  tooltips, keyboard navigation, a table view, and a click on a bar to search that year only
+  (see [Chart](#chart))
 - A results-per-page choice (10, 25, 50 or 100), remembered for the next visit
 - Pagination with Previous/Next and page numbers ("Showing 26–50 of 71,213"), compact on phones
 - The query, page and page size live in the URL, so searches can be bookmarked and shared and the
@@ -34,7 +37,8 @@ charts how all matching papers are distributed over time.
 - Responsive layout from phone to desktop, keyboard friendly, with screen reader announcements for
   result counts and focus moved to the results after each search
 - Retries with backoff on rate limits and transient failures, and a 30 second timeout per request
-- One request per user action; repeated or cosmetic URL changes never trigger a second search
+- One results request per user action, plus one chart request per new query; paging, changing the
+  page size and repeated or cosmetic URL changes never trigger another search or chart request
 
 CORE serves at most 100 results per request and only the first 10,000 results of any search, so
 pagination stops at the 10,000th result and says so.
@@ -55,8 +59,51 @@ pagination stops at the 10,000th result and says so.
 Other fields include `abstract`, `fullText`, `documentType`, `fieldOfStudy`, `publisher`, `doi`
 and `language`. CORE also reads lowercase `and`, `or` and `not` as operators, and it ignores an
 OR group nested inside other brackets; the app warns about both and removes brackets around the
-whole query before sending it. The [walkthrough](docs/WALKTHROUGH.md#phase-5-boolean-search) has
-the details and the evidence.
+whole query before sending it.
+
+## Chart
+
+Beside the results on wide screens, and above them on phones, a bar chart shows how many of the
+papers matching the search were published in each year. It counts every match, not just the page
+on screen: for `drone AND (package OR delivery)` it covers all 4,729 papers.
+
+**How the counts are made.** CORE has an aggregation endpoint,
+`POST /v3/search/works/aggregate` with `{ "q": "...", "aggregations": ["yearPublished"] }`, that
+returns the number of matches per publication year in one request. The app sends it the same query
+as the results request, so the chart and the result count always describe the same set of papers.
+The alternative, one count request per year (`<query> AND yearPublished:2020` with `limit=1`),
+would take 15 or more requests per search against a limit of about 10 per window, and composing
+those queries is easy to get wrong (see below).
+
+**What is drawn.** The individual years run back from the latest one until they cover 98% of the
+dated papers, between 10 and 30 bars. Older papers are counted in one line under the chart, with a
+link that searches them, rather than as a wider bar on the same axis. The current year is marked as
+the year so far. Years after the current one and impossible years such as 1000 or 9999 are data
+errors in CORE and are left out, and the chart says how many papers have no usable year. CORE
+returns at most 100 years, the ones with the most papers; when it hits that cap the count for older
+papers is shown as a lower bound.
+
+**Narrowing to a year.** Selecting a bar searches that year only, by adding `yearPublished:YYYY` to
+the query. The year is added to the query as CORE receives it (see
+[Search syntax](#search-syntax)), not to the text as typed, because CORE ignores an OR group nested
+in brackets: `(drone AND (package OR delivery)) AND yearPublished:2020` returns 5,626 papers, the
+count for every drone paper from 2020, while `drone AND (package OR delivery) AND yearPublished:2020`
+returns 354, the height of the bar. A query that is an OR at the top level is bracketed first
+(`(drone OR quadcopter) AND yearPublished:2020`, 6,068, again the bar's height). When bracketing
+would nest another OR group, or the query already filters by year, the bars are not selectable.
+
+**Requests.** The chart asks CORE only after the results have arrived, so it never delays them.
+Answers are kept for the session per query, so paging, changing the page size or going back to an
+earlier search costs nothing; a request still in flight is cancelled when the query changes. Errors
+are shown in the chart with a retry button and never affect the results. CORE only allows
+aggregation as a `POST`, which Vercel's CDN does not cache, so unlike searches these requests always
+reach CORE; in testing they did not use up the rate-limit allowance that searches count against.
+
+The chart is hand-built SVG, measured to the width it is given: round tick values, compact numbers
+on the axis above 10,000, year labels thinned to fit at phone width, a label on the highest bar, a
+tooltip on hover and keyboard focus, and bars that form a single tab stop moved with the arrow
+keys. A "Show as table" toggle gives the same numbers as a table. Bars grow in when drawn, unless
+the system asks for reduced motion.
 
 ## Tech stack
 
@@ -157,10 +204,12 @@ origins, so a browser on any other site cannot read its responses. The app there
 
 **The function** (`api/core-search.mjs`, logic in `api/_lib/core-search.mjs`):
 
-- only answers `GET` for the search endpoint, and always calls the same upstream URL,
-  `https://api.core.ac.uk/v3/search/works/`. Other methods get `405`, other `/core-api/` paths `404`,
-  and unknown query parameters, a missing `q` or a `limit`/`offset` beyond CORE's limits `400`,
-  before any request to CORE. It is not an open proxy.
+- only answers `GET` for the search endpoint and `POST` for the aggregation endpoint
+  (`/core-api/v3/search/works/aggregate`), and always calls the same two upstream URLs. Other
+  methods get `405`, other `/core-api/` paths `404`, and unknown query parameters, a missing `q` or
+  a `limit`/`offset` beyond CORE's limits `400`, before any request to CORE. An aggregation body may
+  only hold `q` and `aggregations` (and only `yearPublished` for now), is limited to 4 KB, and is
+  rebuilt from those fields before it is sent. It is not an open proxy.
 - forwards the query string unchanged and adds `Authorization: Bearer $CORE_API_KEY` when that
   environment variable is set. Without it, the function works anonymously. Nothing from the
   browser's request headers is forwarded.
@@ -168,9 +217,9 @@ origins, so a browser on any other site cannot read its responses. The app there
   failure into `502`, both as JSON `{ "error": "..." }`.
 - passes on CORE's status, JSON body, `Content-Type` and rate-limit headers (`X-RateLimit-*`,
   `Retry-After`), which the app's retry logic reads.
-- marks successful responses `Cache-Control: public, s-maxage=300, stale-while-revalidate=600`, so
+- marks successful searches `Cache-Control: public, s-maxage=300, stale-while-revalidate=600`, so
   Vercel's CDN serves the same search URL from its cache for five minutes and refreshes it in the
-  background for ten more. Errors, including `429`, are `no-store`.
+  background for ten more. Errors, including `429`, and aggregation answers are `no-store`.
 - never returns or logs the key: only selected headers are passed on, the body is scrubbed of it in
   case CORE ever echoed it, and errors are logged by name only.
 
@@ -183,9 +232,8 @@ only. The Angular build never reads it; only the function does, at request time.
 `maxDuration` of 30 seconds, sends every other path without a file extension (outside `/api/` and
 `/core-api/`) to `index.html` so deep links work, and adds `X-Content-Type-Options` and
 `Referrer-Policy` headers. A missing file such as `/does-not-exist.js` still gets `index.html` with
-status `200` on Vercel, because Vercel's Angular preset adds its own catch-all after these rules; see
-the [walkthrough](docs/WALKTHROUGH.md#the-404-for-missing-files) for why `"framework": null` does
-not fix that. Leave Vercel's `trailingSlash` option unset: the search path keeps its trailing slash
+status `200` on Vercel, because Vercel's Angular preset adds its own catch-all after these rules
+(`"framework": null` does not change that). Leave Vercel's `trailingSlash` option unset: the search path keeps its trailing slash
 (`/v3/search/works/`), and `trailingSlash: false` would redirect it away from the function.
 
 **Deploy your own copy.** Fork the repository, choose "Add New Project" in Vercel, import the fork
@@ -209,9 +257,10 @@ src/
       search/          the search page (lazy loaded), search bar, help panel, URL params, paging
                        maths, page size preference and recent searches
         query/         query analyser (tokenizer, parser, diagnostics) and the CORE workarounds
+        chart/         the publication years chart, its per-query cache and year bucketing
     shared/
       ui/              presentational components: paper card, skeleton, empty and error states,
-                       pagination, term highlighting
+                       pagination, term highlighting, bar chart
     app.config.ts      application providers
     app.routes.ts      routes
   environments/        build-time configuration, including the optional API key
@@ -220,8 +269,6 @@ api/
   core-search.mjs      Vercel function: the production proxy for CORE search
   _lib/                its logic and tests (node --test); the leading underscore stops Vercel
                        from deploying these files as functions
-docs/
-  WALKTHROUGH.md       design decisions and notes, phase by phase
 proxy.conf.json        dev-server proxy for the CORE API
 vercel.json            Vercel build settings, function rewrite, SPA fallback and headers
 ```
@@ -229,7 +276,6 @@ vercel.json            Vercel build settings, function rewrite, SPA fallback and
 ## How I built this
 
 Built with Claude Code as an AI pair-programmer; I reviewed, tested and understand every change.
-Design decisions are explained in [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md).
 
 ## Roadmap
 
@@ -238,5 +284,5 @@ Design decisions are explained in [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md).
 - [x] 3. Paper cards with loading, empty and error states; responsive and accessible
 - [x] 4. Results-per-page control, pagination and state in the URL
 - [x] 5. Boolean keyword search with validation, help and search history
-- [ ] 6. Chart of papers per year across all matching results
+- [x] 6. Chart of papers per year across all matching results
 - [ ] 7. Extras: response cache, CSV/BibTeX export, dark mode

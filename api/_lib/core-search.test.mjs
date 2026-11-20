@@ -1,15 +1,20 @@
 import assert from 'node:assert/strict';
+import { Readable } from 'node:stream';
 import { describe, it } from 'node:test';
 import {
+  MAX_BODY_BYTES,
   NO_CACHE,
   SUCCESS_CACHE_CONTROL,
+  UPSTREAM_AGGREGATE_URL,
   UPSTREAM_URL,
   buildUpstreamHeaders,
   cacheControlFor,
   createHandler,
+  isAggregatePath,
   isSearchPath,
   pickResponseHeaders,
   redactKey,
+  validateAggregateBody,
   validateQuery,
 } from './core-search.mjs';
 
@@ -48,10 +53,25 @@ function json(status, body, headers = {}) {
   });
 }
 
-async function run(handler, { method = 'GET', url = SEARCH } = {}) {
+const AGGREGATE = '/core-api/v3/search/works/aggregate';
+const YEARS_BODY = JSON.stringify({
+  q: 'drone AND (package OR delivery)',
+  aggregations: ['yearPublished'],
+});
+
+async function run(handler, { method = 'GET', url = SEARCH, body = '', headers = {} } = {}) {
   const res = fakeResponse();
-  await handler({ method, url }, res);
+  const req = Object.assign(Readable.from(body ? [Buffer.from(body)] : []), {
+    method,
+    url,
+    headers,
+  });
+  await handler(req, res);
   return res;
+}
+
+function aggregate(handler, body = YEARS_BODY, headers = { 'content-type': 'application/json' }) {
+  return run(handler, { method: 'POST', url: AGGREGATE, body, headers });
 }
 
 const silent = { error() {} };
@@ -75,6 +95,40 @@ describe('isSearchPath', () => {
       assert.equal(isSearchPath(path), false, path);
     }
   });
+});
+
+describe('isAggregatePath', () => {
+  it('accepts only the works aggregation path', () => {
+    assert.equal(isAggregatePath(AGGREGATE), true);
+    assert.equal(isAggregatePath(`${AGGREGATE}/`), false);
+    assert.equal(isAggregatePath('/core-api/v3/search/outputs/aggregate'), false);
+  });
+});
+
+describe('validateAggregateBody', () => {
+  it('accepts a query with allowed aggregations and rebuilds the body', () => {
+    assert.deepEqual(validateAggregateBody(YEARS_BODY), {
+      ok: true,
+      body: { q: 'drone AND (package OR delivery)', aggregations: ['yearPublished'] },
+    });
+  });
+
+  for (const [name, text] of [
+    ['invalid JSON', '{"q":'],
+    ['a non-object', '["drone"]'],
+    ['an unknown field', '{"q":"drone","aggregations":["yearPublished"],"limit":5}'],
+    ['a missing query', '{"aggregations":["yearPublished"]}'],
+    ['a blank query', '{"q":"  ","aggregations":["yearPublished"]}'],
+    ['a field that is not allowed', '{"q":"drone","aggregations":["authors"]}'],
+    ['no aggregations', '{"q":"drone","aggregations":[]}'],
+    ['a repeated aggregation', '{"q":"drone","aggregations":["yearPublished","yearPublished"]}'],
+  ]) {
+    it(`rejects ${name}`, () => {
+      const result = validateAggregateBody(text);
+      assert.equal(result.ok, false);
+      assert.equal(result.status, 400);
+    });
+  }
 });
 
 describe('validateQuery', () => {
@@ -156,6 +210,10 @@ describe('pickResponseHeaders', () => {
 });
 
 describe('cacheControlFor', () => {
+  it('never marks a POST as cacheable', () => {
+    assert.equal(cacheControlFor(200, 'POST'), NO_CACHE);
+  });
+
   it('caches successful responses only', () => {
     assert.equal(cacheControlFor(200), SUCCESS_CACHE_CONTROL);
     for (const status of [301, 400, 401, 404, 429, 500, 502, 504]) {
@@ -327,6 +385,50 @@ describe('createHandler', () => {
     for (const res of [post, head, otherPath, badQuery, noQuery]) {
       assert.equal(res.headers['cache-control'], NO_CACHE);
       assert.equal(res.headers['content-type'], 'application/json; charset=utf-8');
+    }
+    assert.equal(calls.length, 0);
+  });
+
+  it('posts a rebuilt aggregation body to the fixed aggregation URL, uncached', async () => {
+    const payload = { aggregations: { yearPublished: { 2020: 354 } } };
+    const { calls, fetchImpl } = fakeFetch(() => json(200, payload));
+    const handler = createHandler({ fetchImpl, getApiKey: () => KEY, log: silent });
+
+    const res = await aggregate(handler);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(JSON.parse(res.body), payload);
+    assert.equal(res.headers['cache-control'], NO_CACHE);
+    assert.equal(calls[0].url, UPSTREAM_AGGREGATE_URL);
+    assert.equal(calls[0].init.method, 'POST');
+    assert.equal(calls[0].init.body, YEARS_BODY);
+    assert.equal(calls[0].init.headers['Content-Type'], 'application/json');
+    assert.equal(calls[0].init.headers.Authorization, `Bearer ${KEY}`);
+    assert.equal(calls[0].init.redirect, 'error');
+  });
+
+  it('rejects bad aggregation requests without calling CORE', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => json(200, {}));
+    const handler = createHandler({ fetchImpl, getApiKey: () => KEY, log: silent });
+
+    const get = await run(handler, { url: `${AGGREGATE}?q=drone` });
+    assert.equal(get.statusCode, 405);
+    assert.equal(get.headers.allow, 'POST');
+
+    const inUrl = await run(handler, { method: 'POST', url: `${AGGREGATE}?q=drone` });
+    assert.equal(inUrl.statusCode, 400);
+
+    const notJson = await aggregate(handler, YEARS_BODY, { 'content-type': 'text/plain' });
+    assert.equal(notJson.statusCode, 415);
+
+    const tooLarge = await aggregate(handler, JSON.stringify({ q: 'x'.repeat(MAX_BODY_BYTES) }));
+    assert.equal(tooLarge.statusCode, 413);
+
+    const badField = await aggregate(handler, '{"q":"drone","aggregations":["authors"]}');
+    assert.equal(badField.statusCode, 400);
+
+    for (const res of [get, inUrl, notJson, tooLarge, badField]) {
+      assert.equal(res.headers['cache-control'], NO_CACHE);
     }
     assert.equal(calls.length, 0);
   });

@@ -1,0 +1,85 @@
+@let chart = layout();
+@if (width()) {
+  <svg
+    class="chart"
+    [attr.width]="chart.width"
+    [attr.height]="height"
+    [attr.viewBox]="'0 0 ' + chart.width + ' ' + height"
+    role="group"
+    [attr.aria-label]="label()"
+  >
+    <g aria-hidden="true">
+      @for (tick of chart.ticks; track tick.value) {
+        <line
+          class="grid"
+          [class.grid--base]="!tick.value"
+          [attr.x1]="chart.left"
+          [attr.x2]="chart.right"
+          [attr.y1]="tick.y"
+          [attr.y2]="tick.y"
+        />
+        <text class="tick" [attr.x]="chart.left - 8" [attr.y]="tick.y" dy="0.32em">
+          {{ tick.label }}
+        </text>
+      }
+    </g>
+
+    @for (bar of chart.bars; track bar.id; let i = $index) {
+      <g [class.is-active]="active() === i">
+        <rect
+          class="band"
+          aria-hidden="true"
+          [attr.x]="bar.x"
+          [attr.y]="chart.top"
+          [attr.width]="chart.band"
+          [attr.height]="chart.plotHeight"
+        />
+        @if (bar.path) {
+          <path class="bar" aria-hidden="true" [attr.d]="bar.path" />
+        }
+        @if (bar.showLabel) {
+          <text
+            class="label"
+            aria-hidden="true"
+            [attr.x]="bar.center"
+            [attr.y]="chart.baseline + 18"
+          >
+            {{ bar.datum.label }}
+          </text>
+        }
+        <rect
+          #hit
+          class="hit"
+          [class.hit--selectable]="selectable()"
+          [attr.x]="bar.x"
+          [attr.y]="chart.top"
+          [attr.width]="chart.band"
+          [attr.height]="chart.plotHeight"
+          [attr.tabindex]="focusable() === i ? 0 : -1"
+          [attr.role]="selectable() ? 'button' : 'img'"
+          [attr.aria-label]="bar.datum.description"
+          (mouseenter)="active.set(i)"
+          (mouseleave)="active.set(null)"
+          (focus)="focus(i)"
+          (blur)="active.set(null)"
+          (click)="select(i)"
+          (keydown)="onKeydown($event, i)"
+        />
+      </g>
+    }
+
+    @if (chart.peak; as peak) {
+      @if (active() !== peak.index) {
+        <text class="peak" aria-hidden="true" [attr.x]="peak.x" [attr.y]="peak.y">
+          {{ peak.text }}
+        </text>
+      }
+    }
+  </svg>
+}
+
+@if (tooltip(); as tip) {
+  <div class="tooltip" aria-hidden="true" [style.left.px]="tip.x" [style.top.px]="tip.y">
+    {{ tip.text }}
+  </div>
+}

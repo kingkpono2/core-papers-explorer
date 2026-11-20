@@ -45,3 +45,11 @@ export interface CoreSearchResponse {
   results: CoreWork[];
   searchId?: string;
 }
+
+/**
+ * `POST /search/works/aggregate`: counts per value of each requested field, keyed by the value.
+ * CORE sends an empty array instead of an object when nothing matches.
+ */
+export interface CoreAggregateResponse {
+  aggregations?: Record<string, Record<string, number> | []> | null;
+}

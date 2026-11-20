@@ -32,3 +32,15 @@ export interface SearchResult {
   limit: number;
   offset: number;
 }
+
+export interface YearCount {
+  year: number;
+  count: number;
+}
+
+export interface YearCounts {
+  /** Sorted by year. */
+  counts: YearCount[];
+  /** CORE returns at most 100 years, the ones with most papers; the rest are missing. */
+  truncated: boolean;
+}

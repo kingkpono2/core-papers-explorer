@@ -13,78 +13,86 @@
 </section>
 
 @let current = state();
-<section
-  class="results"
-  aria-labelledby="results-heading"
-  [attr.aria-busy]="current.status === 'loading'"
->
-  <header class="results__header" [class.visually-hidden]="current.status === 'idle'">
-    <h2 id="results-heading" #resultsHeading tabindex="-1">Results</h2>
-    <p class="summary" aria-live="polite">{{ summary() }}</p>
-  </header>
+<div class="layout">
+  <app-year-chart class="chart" [search]="chartSearch()" (narrowed)="searchFor($event)" />
 
-  @switch (current.status) {
-    @case ('idle') {
-      <app-empty-state
-        heading="Search to begin"
-        [examples]="examples"
-        (exampleSelected)="searchFor($event)"
-      >
-        Search millions of open-access papers from CORE by keyword.
-      </app-empty-state>
-    }
-    @case ('invalid') {
-      <app-empty-state heading="Check the search">
-        This search has a problem, shown under the search box, so it was not sent to CORE.
-      </app-empty-state>
-    }
-    @case ('loading') {
-      <div class="stack">
-        @for (skeleton of skeletons; track skeleton) {
-          <app-skeleton-card />
-        }
-      </div>
-    }
-    @case ('error') {
-      <app-error-state [error]="current.error" (retry)="reload()" />
-    }
-    @case ('success') {
-      @let result = current.result;
-      @let pages = paging()!;
-      @if (result.papers.length) {
-        <!-- role="list" keeps list semantics in Safari once list-style is removed. -->
-        <ol class="stack paper-list" role="list" [start]="result.offset + 1">
-          @for (paper of result.papers; track paper.id) {
-            <li>
-              <app-paper-card [paper]="paper" [highlight]="highlightTerms()" />
-            </li>
-          }
-        </ol>
-        @if (pages.last > 1) {
-          <app-pagination class="pagination" [page]="current.params.page" [lastPage]="pages.last" />
-        }
-        @if (pages.capped) {
-          <p class="note">
-            CORE only serves the first {{ maxResults | number }} results of a search. To see the
-            rest, narrow it down.
-          </p>
-        }
-      } @else if (result.total) {
-        <app-empty-state heading="No papers on this page">
-          The results end on page {{ pages.last | number }}.
-          <a
-            [routerLink]="[]"
-            [queryParams]="{ page: pages.last > 1 ? pages.last : null }"
-            queryParamsHandling="merge"
-            >Go to the last page</a
-          >
-        </app-empty-state>
-      } @else {
-        <app-empty-state heading="No papers found">
-          Nothing matched “{{ current.params.query }}”. Check the spelling, or try fewer or broader
-          keywords.
+  <section
+    class="results"
+    aria-labelledby="results-heading"
+    [attr.aria-busy]="current.status === 'loading'"
+  >
+    <header class="results__header" [class.visually-hidden]="current.status === 'idle'">
+      <h2 id="results-heading" #resultsHeading tabindex="-1">Results</h2>
+      <p class="summary" aria-live="polite">{{ summary() }}</p>
+    </header>
+
+    @switch (current.status) {
+      @case ('idle') {
+        <app-empty-state
+          heading="Search to begin"
+          [examples]="examples"
+          (exampleSelected)="searchFor($event)"
+        >
+          Search millions of open-access papers from CORE by keyword.
         </app-empty-state>
       }
+      @case ('invalid') {
+        <app-empty-state heading="Check the search">
+          This search has a problem, shown under the search box, so it was not sent to CORE.
+        </app-empty-state>
+      }
+      @case ('loading') {
+        <div class="stack">
+          @for (skeleton of skeletons; track skeleton) {
+            <app-skeleton-card />
+          }
+        </div>
+      }
+      @case ('error') {
+        <app-error-state [error]="current.error" (retry)="reload()" />
+      }
+      @case ('success') {
+        @let result = current.result;
+        @let pages = paging()!;
+        @if (result.papers.length) {
+          <!-- role="list" keeps list semantics in Safari once list-style is removed. -->
+          <ol class="stack paper-list" role="list" [start]="result.offset + 1">
+            @for (paper of result.papers; track paper.id) {
+              <li>
+                <app-paper-card [paper]="paper" [highlight]="highlightTerms()" />
+              </li>
+            }
+          </ol>
+          @if (pages.last > 1) {
+            <app-pagination
+              class="pagination"
+              [page]="current.params.page"
+              [lastPage]="pages.last"
+            />
+          }
+          @if (pages.capped) {
+            <p class="note">
+              CORE only serves the first {{ maxResults | number }} results of a search. To see the
+              rest, narrow it down.
+            </p>
+          }
+        } @else if (result.total) {
+          <app-empty-state heading="No papers on this page">
+            The results end on page {{ pages.last | number }}.
+            <a
+              [routerLink]="[]"
+              [queryParams]="{ page: pages.last > 1 ? pages.last : null }"
+              queryParamsHandling="merge"
+              >Go to the last page</a
+            >
+          </app-empty-state>
+        } @else {
+          <app-empty-state heading="No papers found">
+            Nothing matched “{{ current.params.query }}”. Check the spelling, or try fewer or
+            broader keywords.
+          </app-empty-state>
+        }
+      }
     }
-  }
-</section>
+  </section>
+</div>

@@ -1,5 +1,8 @@
-import { CoreLink, CoreSearchResponse, CoreWork } from './core-api.models';
-import { Paper, SearchResult } from './paper';
+import { CoreAggregateResponse, CoreLink, CoreSearchResponse, CoreWork } from './core-api.models';
+import { Paper, SearchResult, YearCounts } from './paper';
+
+/** CORE's cap on the values returned per aggregated field (checked November 2026). */
+export const CORE_MAX_AGGREGATION_BUCKETS = 100;
 
 const NAMED_ENTITIES: Record<string, string> = {
   amp: '&',
@@ -24,6 +27,15 @@ export function toSearchResult(response: CoreSearchResponse): SearchResult {
     limit: response.limit,
     offset: response.offset,
   };
+}
+
+export function toYearCounts(response: CoreAggregateResponse): YearCounts {
+  const buckets = Object.entries(response.aggregations?.['yearPublished'] ?? {});
+  const counts = buckets
+    .map(([year, count]) => ({ year: Number(year), count }))
+    .filter(({ year, count }) => Number.isInteger(year) && Number.isInteger(count) && count > 0)
+    .sort((a, b) => a.year - b.year);
+  return { counts, truncated: buckets.length >= CORE_MAX_AGGREGATION_BUCKETS };
 }
 
 export function toPaper(work: CoreWork): Paper {
