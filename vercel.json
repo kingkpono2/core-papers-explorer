@@ -2,9 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
   "outputDirectory": "dist/core-papers-explorer/browser",
+  "functions": {
+    "api/core-search.mjs": { "maxDuration": 30 }
+  },
   "rewrites": [
-    { "source": "/core-api/(.*)", "destination": "https://api.core.ac.uk/$1" },
-    { "source": "/((?!core-api/|.*\\.[^/]+$).*)", "destination": "/index.html" }
+    { "source": "/core-api/v3/search/works/", "destination": "/api/core-search" },
+    { "source": "/core-api/(.*)", "destination": "/api/core-search" },
+    { "source": "/((?!core-api/|api/|.*\\.[^/]+$).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
