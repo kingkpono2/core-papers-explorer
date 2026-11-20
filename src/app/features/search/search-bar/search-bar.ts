@@ -3,6 +3,8 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   input,
@@ -42,6 +44,8 @@ export class SearchBar {
   readonly searched = output<string>();
 
   private readonly recent = inject(RecentSearches);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   private readonly input = viewChild.required<ElementRef<HTMLInputElement>>('queryInput');
   private readonly helpToggle = viewChild.required<ElementRef<HTMLButtonElement>>('helpToggle');
   private timer?: ReturnType<typeof setTimeout>;
@@ -132,6 +136,15 @@ export class SearchBar {
   protected runExample(query: string): void {
     this.helpOpen.set(false);
     this.run(query);
+  }
+
+  /** Opens the help panel and moves focus to one of its notes, such as `search-help-phrase`. */
+  showHelp(noteId: string): void {
+    this.helpOpen.set(true);
+    afterNextRender(
+      () => this.host.nativeElement.querySelector<HTMLElement>(`#${noteId}`)?.focus(),
+      { injector: this.injector },
+    );
   }
 
   protected closeHelp(): void {

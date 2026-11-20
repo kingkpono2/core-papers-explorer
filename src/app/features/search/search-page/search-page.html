@@ -36,6 +36,32 @@
         }
       </div>
       <p class="summary" aria-live="polite">{{ summary() }}</p>
+      <!-- A status region, so a change to the query is read out without interrupting. -->
+      <div class="adjusted" role="status">
+        @if (adjustment(); as adjusted) {
+          <p class="notice">
+            Searched for <code>{{ adjusted.sent }}</code
+            >.
+            @switch (adjusted.change) {
+              @case ('nested-or') {
+                The outer brackets were removed because CORE ignores an OR group nested inside other
+                brackets, so with them it would match far more papers than intended.
+              }
+              @case ('outer-brackets') {
+                The brackets around the whole query were removed; they make no difference to what it
+                matches.
+              }
+              @case ('phrase') {
+                CORE fails on a search that is only a quoted phrase, so it was put in brackets,
+                which does not change what it matches.
+              }
+            }
+            <button type="button" class="link-button" (click)="explain(adjusted.change)">
+              Why?
+            </button>
+          </p>
+        }
+      </div>
     </header>
 
     @switch (current.status) {

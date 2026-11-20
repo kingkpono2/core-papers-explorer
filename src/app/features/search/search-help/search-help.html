@@ -46,11 +46,15 @@
       Ranges in square brackets, such as <code>[2019 TO 2021]</code>, make CORE fail. Use two
       comparisons instead.
     </li>
-    <li>
+    <li id="search-help-nested-or" tabindex="-1">
       CORE ignores an OR group inside other brackets, as in
       <code>(drone AND (package OR delivery)) AND yearPublished&gt;2019</code>. Brackets around the
       whole query are removed before searching, so <code>(drone AND (package OR delivery))</code>
       works as expected.
+    </li>
+    <li id="search-help-phrase" tabindex="-1">
+      CORE fails on a search that is only a quoted phrase, such as <code>"drone delivery"</code>, so
+      it is sent in brackets: <code>("drone delivery")</code>. The results are the same.
     </li>
     <li>
       The number of results comes from CORE. For a quoted phrase in a field, such as

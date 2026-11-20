@@ -22,6 +22,35 @@ export function toCoreQuery(query: string): string {
 }
 
 /**
+ * Why the query sent to CORE differs from the one written, so the user can be told:
+ *
+ * - `nested-or`: brackets around the whole query were removed, and with them an OR group inside
+ *   would have been ignored by CORE.
+ * - `outer-brackets`: brackets around the whole query were removed, which changes nothing.
+ * - `phrase`: a lone quoted phrase was put in brackets, because CORE fails on it otherwise.
+ */
+export type CoreQueryChange = 'nested-or' | 'outer-brackets' | 'phrase';
+
+/** What is sent to CORE and why, or null when it is the query as written (bar whitespace). */
+export function coreQueryAdjustment(
+  query: string,
+): { sent: string; change: CoreQueryChange } | null {
+  const text = normaliseQuery(query);
+  const sent = toCoreQuery(text);
+  if (sent === text) {
+    return null;
+  }
+  const { ast } = analyseQuery(sent);
+  const change =
+    ast?.kind === 'group' && ast.child.kind === 'phrase'
+      ? 'phrase'
+      : ast && hasOrGroup(ast)
+        ? 'nested-or'
+        : 'outer-brackets';
+  return { sent, change };
+}
+
+/**
  * The query narrowed by `clause`, such as `yearPublished:2020`, in a form CORE reads correctly, or
  * null when it cannot be done without changing what the query means.
  *
@@ -43,6 +72,20 @@ export function narrowQuery(query: string, clause: string): string | null {
 
 function nestedOrGroups(query: string): number {
   return analyseQuery(query).diagnostics.filter((d) => d.code === 'nested-or-group').length;
+}
+
+function hasOrGroup(node: QueryNode): boolean {
+  switch (node.kind) {
+    case 'and':
+    case 'or':
+      return node.children.some(hasOrGroup);
+    case 'group':
+      return node.child.kind === 'or' || hasOrGroup(node.child);
+    case 'not':
+      return hasOrGroup(node.child);
+    default:
+      return false;
+  }
 }
 
 function mentionsField(node: QueryNode, field: string): boolean {
