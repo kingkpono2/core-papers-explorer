@@ -27,6 +27,12 @@ Live demo: https://core-papers-explorer.vercel.app
   fills in year by year. For the brief's example it finds three topics and that "last mile ·
   logistics" is growing fastest, with 73% of its papers since 2023 (see
   [Research Galaxy](#research-galaxy)).
+- **Resilience you can test, not just read about.** Press Shift+D for Under the hood: every
+  request to CORE as it happens, its time split into CORE, proxy and network by the proxy's
+  `Server-Timing`, retries numbered as attempts with the reason for each wait, cache hits in memory
+  and at the CDN, p50 and p95 latency and CORE's rate-limit budget. Its Break it switches make
+  requests fail on purpose (rate limited, offline, slow, rejected, unavailable), and the app's real
+  retry and error handling deal with it (see [Under the hood](#under-the-hood)).
 
 ### Reviewer quick tour (60 seconds)
 
@@ -38,12 +44,16 @@ Live demo: https://core-papers-explorer.vercel.app
 3. [Open the Galaxy and press Play](<https://core-papers-explorer.vercel.app/galaxy?q=(drone%20AND%20(package%20OR%20delivery))>):
    the brief's example as three topics; watch them form year by year, hover a star, then choose
    "last mile · logistics" in the legend and "Search this topic".
-4. Back on a search, click a bar in "Publication years" to search that year only (2020 gives 354
+4. Break it: open Under the hood (Shift+D) and switch on "Rate limited", then close it and search.
+   The results arrive about six seconds late, and Under the hood shows why: two faked `429`s, the
+   3-second waits CORE's `Retry-After` asked for and the attempt that got through. "Offline" shows
+   the error message and Retry instead.
+5. Back on a search, click a bar in "Publication years" to search that year only (2020 gives 354
    papers, the bar's height), or press "Show as table".
-5. Open "How to search", or try a broken query such as
+6. Open "How to search", or try a broken query such as
    [`Title:drone AND (`](https://core-papers-explorer.vercel.app/?q=Title:drone%20AND%20%28): the
    mistakes are explained under the box and nothing is sent to CORE.
-6. Press "Export" above the results for CSV or BibTeX of the page, and the theme switch in the
+7. Press "Export" above the results for CSV or BibTeX of the page, and the theme switch in the
    header for dark mode.
 
 The start screen offers the same tour as one-click steps.
@@ -119,6 +129,14 @@ Speed and resilience
 - Loading skeletons, a no-results screen and error messages with Retry, worded for rate limits,
   timeouts, network failures and bad queries
 
+Under the hood
+
+- A drawer (Shift+D, or the button in the header) listing every request to CORE live, with its
+  time split by `Server-Timing`, retries as numbered attempts, cache hits, the proxy's request id,
+  and the session's p50 and p95 latency, error rate, cache hit rate and rate-limit budget
+- Break it switches that make requests fail on purpose to show the app's real retry and error
+  handling, with a banner on every page while any is on (see [Under the hood](#under-the-hood))
+
 Look and accessibility
 
 - Light and dark themes that follow the system setting, with a switch in the header that is
@@ -136,7 +154,7 @@ Engineering
 - A Vercel function in front of CORE that keeps the API key on the server, lets the CDN cache
   searches for five minutes and only allows the two endpoints the app uses (see
   [Deployment](#deployment))
-- 535 unit tests (Karma) and 34 tests for the serverless function (`node --test`), run with lint,
+- 687 unit tests (Karma) and 40 tests for the serverless function (`node --test`), run with lint,
   format check and a production build on every push by GitHub Actions
 - Deployed on Vercel with preview deployments for branches
 
@@ -164,6 +182,62 @@ Engineering
 - **Aggregation.** POST only, at most 100 years (the busiest ones, so older counts are shown as
   "at least"), and some impossible years such as 1000 or 9999, which the chart leaves out and
   reports.
+
+## Under the hood
+
+Press Shift+D, or "Under the hood" in the header, for a drawer that shows how the app talks to
+CORE. Unlike the browser's network panel it can say what the app decided as well as what was sent,
+and it can break things on purpose.
+
+**What it records.** An HTTP interceptor (`under-the-hood.interceptor.ts`, after the API key
+interceptor) records each request to `/core-api`: method, endpoint and decoded query, when it
+started and how long it took (`performance.now()`), its status and how the app classed a failure,
+its size, the proxy's `Server-Timing` (`core` and `proxy`, which split the time into CORE, the
+proxy and the network), `x-vercel-cache`, CORE's `X-RateLimit-Remaining` and `X-RateLimit-Limit`,
+and the proxy's `X-Request-Id`, which can be copied to find the request in the function's log.
+Retries share a trace with the request they repeat (`RequestTrace`, kept in the request's
+`HttpContext`), so they are listed as attempts 1, 2 and 3 of one request, each with what the retry
+policy decided next: how long it waited and whether that was the backoff or CORE's `Retry-After`,
+or why it gave up. Pages and chart counts answered from the app's caches are listed as requests
+that were never made. From these the drawer works out the session's requests, p50 and p95 latency
+(nearest rank), error rate, cache hit rate (memory and CDN), requests saved by caching and the
+rate-limit budget left.
+
+**Break it.** Five switches make requests fail on purpose. The interceptor fakes the answer
+instead of sending the request, shaped like the real failure, so the rest of the app meets it
+exactly as it would meet a real one:
+
+- **Rate limited**: the first two attempts of each request get a `429` with CORE's
+  `X-RateLimit-Retry-After` three seconds ahead. The app waits twice as asked, then shows the
+  results.
+- **Offline**: every attempt fails as a network error (status 0). The app retries after 1, 2 and
+  4 seconds, then says it could not reach CORE, with Retry.
+- **Slow CORE**: every attempt is held for five seconds before it is sent. The placeholders stay
+  up longer and the results arrive; nothing times out, as the app allows 30 seconds.
+- **CORE rejects the query**: CORE's `500` "Azure search failed with status code: 400". The app
+  does not retry, since it would fail again, and asks for the query to be checked, without Retry.
+- **CORE unavailable**: a `503` for every attempt. The app retries after 1, 2 and 4 seconds, then
+  says CORE is having trouble, with Retry.
+
+Switches can be combined, and apply in the order a request meets them: offline, slow, the rate
+limit, then CORE itself. While any is on, a banner under the header says that requests are being
+sabotaged, with a button that turns them all off, and the list marks each faked answer.
+
+**Privacy and cost.** Everything stays in the tab's memory: the last 100 requests, in a ring
+buffer, and the switches, which are always off when the app loads. Nothing is stored or sent
+anywhere. Recording costs a write to the buffer; the drawer's code (about 8 KB compressed) is
+loaded the first time it opens, and the list is only drawn while it is open.
+
+**Locally** the dev server proxies straight to CORE, so there is no function and no CDN: requests
+show the browser's timing and CORE's rate-limit headers, but no `Server-Timing`, request id or
+cache status, and the drawer says so. On Vercel the function adds `Server-Timing` and
+`X-Request-Id` to every response, and the CDN adds `x-vercel-cache`.
+
+**Accessibility.** The drawer is a modal dialog, a bottom sheet on phones, that keeps focus
+inside, closes with Esc and gives focus back to where it was; Shift+D is ignored while typing. New
+failures are announced politely, at most every three seconds. Every control is labelled, each bar
+is also written out as text, colours meet WCAG AA in both themes, and motion is reduced when the
+system asks.
 
 ## Search syntax
 
@@ -416,8 +490,14 @@ origins, so a browser on any other site cannot read its responses. The app there
 - marks successful searches `Cache-Control: public, s-maxage=300, stale-while-revalidate=600`, so
   Vercel's CDN serves the same search URL from its cache for five minutes and refreshes it in the
   background for ten more. Errors, including `429`, and aggregation answers are `no-store`.
+- adds two headers to every response, success or error: `Server-Timing`, with `core;dur=` for the
+  time spent on the request to CORE (when there was one) and `proxy;dur=` for the whole time in the
+  function, and a random `X-Request-Id`, which is also in the log line when CORE cannot be reached.
+  Vercel's CDN adds `x-vercel-cache` (`HIT`, `MISS` or `STALE`); a response served from the cache
+  keeps the headers of the request that filled it. Locally the dev server proxies straight to CORE,
+  so there is no function and no CDN, and none of these headers.
 - never returns or logs the key: only selected headers are passed on, the body is scrubbed of it in
-  case CORE ever echoed it, and errors are logged by name only.
+  case CORE ever echoed it, and errors are logged by name and request id only.
 
 **Setting the key.** In the Vercel project, open Settings → Environment Variables, add
 `CORE_API_KEY` with your [CORE API key](https://core.ac.uk/services/api) for the Production (and,
@@ -445,10 +525,13 @@ deployment shares CORE's anonymous limit. Another host works if it serves
 src/
   app/
     core/              app-wide singletons
-      api/             CoreApiService, retry policy, error model, API config token
+      api/             CoreApiService, retry policy, error model, API config token, request traces
       cache/           the LRU cache with expiry used for results and chart counts
-      interceptors/    adds the optional API key to CORE requests
-      layout/          site header and footer, theme switch
+      diagnostics/     Under the hood's request log, Server-Timing parsing, Break it switches and
+                       drawer state
+      interceptors/    adds the optional API key to CORE requests; records them for Under the hood
+                       and applies the Break it switches
+      layout/          site header and footer, theme switch, fault injection banner
       models/          raw CORE API types, the app's Paper model and the mapper between them
       routing/         tab titles that include the query
       theme/           the saved light or dark theme
@@ -463,6 +546,8 @@ src/
         query/         query analyser (tokenizer, parser, diagnostics) and the CORE workarounds
         chart/         the publication years chart, its per-query cache and year bucketing
         export/        CSV and BibTeX export and the Export menu
+      under-the-hood/  the Under the hood drawer (loaded when first opened): session figures,
+                       Break it switches, live requests, and the maths behind them
     shared/
       ui/              presentational components: paper card, skeleton, empty and error states,
                        pagination, term highlighting, bar chart, line chart, Results and Galaxy

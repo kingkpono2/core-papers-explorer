@@ -1,6 +1,7 @@
 import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
-import { MonoTypeOperatorFunction, defer, retry, throwError, timer } from 'rxjs';
+import { MonoTypeOperatorFunction, defer, retry, tap, throwError, timer } from 'rxjs';
 import { isRejectedQuery } from './api-error';
+import { RequestTrace } from './request-trace';
 
 export interface RetryPolicy {
   maxRetries: number;
@@ -15,26 +16,63 @@ export interface RetryPolicy {
  * backoff, except CORE's 500 for a query it cannot parse, which would only fail again. A 429 waits
  * at least until the server's Retry-After time. Gives up instead of waiting past
  * `maxTotalDelayMs`. Other errors, including timeouts and 4xx, are rethrown immediately.
+ *
+ * Each decision is noted on `trace`, if given, so Under the hood can say why an attempt was or was
+ * not followed by another.
  */
-export function retryTransient<T>(policy: RetryPolicy): MonoTypeOperatorFunction<T> {
+export function retryTransient<T>(
+  policy: RetryPolicy,
+  trace?: RequestTrace,
+): MonoTypeOperatorFunction<T> {
   return (source) =>
     defer(() => {
       let totalDelayMs = 0;
+      let waiting = false;
+      let settled = false;
+      const giveUp = (error: unknown, reason: 'permanent' | 'wait-budget') => {
+        settled = true;
+        trace?.note({ type: 'give-up', reason, error });
+        return throwError(() => error);
+      };
       return source.pipe(
         retry({
           count: policy.maxRetries,
           delay: (error: unknown, attempt: number) => {
             if (!isTransient(error)) {
-              return throwError(() => error);
+              return giveUp(error, 'permanent');
             }
             const backoffMs = policy.baseDelayMs * 2 ** (attempt - 1);
             const retryAfter = error.status === 429 ? retryAfterMs(error.headers) : null;
             const delayMs = Math.max(backoffMs, retryAfter ?? 0);
             if (totalDelayMs + delayMs > policy.maxTotalDelayMs) {
-              return throwError(() => error);
+              return giveUp(error, 'wait-budget');
             }
             totalDelayMs += delayMs;
-            return timer(delayMs);
+            waiting = true;
+            trace?.note({
+              type: 'retry',
+              delayMs,
+              reason: delayMs > backoffMs ? 'retry-after' : 'backoff',
+            });
+            return timer(delayMs).pipe(tap(() => (waiting = false)));
+          },
+        }),
+        tap({
+          complete: () => (settled = true),
+          // Once every retry is used, retry() passes the last error on without asking delay().
+          error: (error: unknown) => {
+            if (!settled) {
+              settled = true;
+              const reason = isTransient(error) ? 'exhausted' : 'permanent';
+              trace?.note({ type: 'give-up', reason, error });
+            }
+          },
+          // Unsubscribing during an attempt cancels that request, which the interceptor records;
+          // during a wait it cancels the retry, which only this operator knows about.
+          unsubscribe: () => {
+            if (waiting) {
+              trace?.note({ type: 'cancelled' });
+            }
           },
         }),
       );

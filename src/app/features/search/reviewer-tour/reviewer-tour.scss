@@ -95,4 +95,12 @@ h2 {
     font-size: 0.95em;
     overflow-wrap: anywhere;
   }
+
+  kbd {
+    padding: 0 0.25em;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+  }
 }

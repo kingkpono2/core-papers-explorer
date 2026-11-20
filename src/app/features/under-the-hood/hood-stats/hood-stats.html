@@ -1,0 +1,56 @@
+@let s = stats();
+<section class="stats" aria-labelledby="hood-stats-heading">
+  <h3 id="hood-stats-heading">Session</h3>
+  <dl class="tiles">
+    <div class="tile">
+      <dt>Requests</dt>
+      <dd class="tile__value">{{ s.requests }}</dd>
+      <dd class="tile__detail">
+        {{ s.faked ? 'plus ' + s.faked + ' faked by Break it' : 'attempts sent' }}
+      </dd>
+    </div>
+    <div class="tile">
+      <dt>Median (p50)</dt>
+      <dd class="tile__value">{{ ms(s.p50Ms) }}</dd>
+      <dd class="tile__detail">per attempt</dd>
+    </div>
+    <div class="tile">
+      <dt>p95 latency</dt>
+      <dd class="tile__value">{{ ms(s.p95Ms) }}</dd>
+      <dd class="tile__detail">per attempt</dd>
+    </div>
+    <div class="tile">
+      <dt>Error rate</dt>
+      <dd class="tile__value">{{ percent(s.errorRate) }}</dd>
+      <dd class="tile__detail">{{ s.failed }} of {{ s.finished }} attempts</dd>
+    </div>
+    <div class="tile">
+      <dt>Cache hit rate</dt>
+      <dd class="tile__value">{{ percent(s.cacheHitRate) }}</dd>
+      <dd class="tile__detail">memory + CDN</dd>
+    </div>
+    <div class="tile">
+      <dt>Saved by cache</dt>
+      <dd class="tile__value">{{ s.memoryHits + s.cdnHits }}</dd>
+      <dd class="tile__detail">{{ s.memoryHits }} memory · {{ s.cdnHits }} CDN</dd>
+    </div>
+    <div class="tile tile--wide">
+      <dt>Rate-limit budget</dt>
+      @if (budget(); as b) {
+        <dd class="tile__value">{{ b.remaining }} of {{ b.limit }} left</dd>
+        <dd
+          class="gauge"
+          [class.gauge--low]="b.level === 'low'"
+          [class.gauge--critical]="b.level === 'critical'"
+          aria-hidden="true"
+        >
+          <span class="gauge__fill" [style.width.%]="b.percent"></span>
+        </dd>
+        <dd class="tile__detail">From CORE’s X-RateLimit headers</dd>
+      } @else {
+        <dd class="tile__value tile__value--none">Not known yet</dd>
+        <dd class="tile__detail">CORE sends it with its answers</dd>
+      }
+    </div>
+  </dl>
+</section>

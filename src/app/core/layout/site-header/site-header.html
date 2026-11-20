@@ -15,6 +15,25 @@
       >
       <a routerLink="/galaxy" routerLinkActive="is-active" ariaCurrentWhenActive="page">Galaxy</a>
     </nav>
+    <button
+      #hoodButton
+      type="button"
+      class="hood"
+      aria-haspopup="dialog"
+      aria-keyshortcuts="Shift+D"
+      title="Under the hood (Shift+D)"
+      (click)="openHood()"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4.5 16.5a8 8 0 1 1 15 0" />
+        <path d="m12 13 3.5-4" />
+        <circle cx="12" cy="13.5" r="1.25" />
+      </svg>
+      <span class="hood__label">Under the hood</span>
+      @if (faults.active()) {
+        <span class="hood__faults"><span class="visually-hidden">, fault injection on</span></span>
+      }
+    </button>
     <app-theme-toggle class="theme" />
   </div>
 </header>

@@ -1,6 +1,7 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { makePaper } from '../../../testing/paper.fixture';
+import { RequestLog } from '../../core/diagnostics/request-log';
 import { SearchResult } from '../../core/models/paper';
 import { SearchResultsCache } from './search-results-cache';
 
@@ -24,6 +25,24 @@ describe('SearchResultsCache', () => {
     expect(cache.get({ query: 'drone', limit: 10, offset: 10 })).toBeUndefined();
     expect(cache.get({ query: 'drone', limit: 25, offset: 0 })).toBeUndefined();
     expect(cache.get({ query: 'drones', limit: 10, offset: 0 })).toBeUndefined();
+  });
+
+  it('logs each page it serves as a request that was never made', () => {
+    const log = TestBed.inject(RequestLog);
+    cache.set({ query: 'drone', limit: 10, offset: 0 }, result);
+
+    cache.get({ query: 'robots', limit: 10 });
+    expect(log.entries()).toEqual([]);
+
+    cache.get({ query: 'drone', limit: 10 });
+    expect(log.entries()).toEqual([
+      jasmine.objectContaining({
+        source: 'memory',
+        method: 'GET',
+        endpoint: '/search/works/',
+        query: 'drone',
+      }),
+    ]);
   });
 
   it('forgets results after five minutes', () => {

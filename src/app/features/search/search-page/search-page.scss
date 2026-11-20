@@ -70,7 +70,7 @@ select {
 
   .chart {
     position: sticky;
-    top: var(--space-4);
+    top: calc(var(--space-4) + var(--fault-banner-offset, 0px));
     grid-column: 2;
     grid-row: 1;
   }

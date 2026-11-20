@@ -18,6 +18,8 @@
   --color-focus: #8ab4ff;
   --color-danger: #ff9a8f;
   --color-danger-soft: #3a1f1d;
+  --color-success: #7ee2a0;
+  --color-success-soft: #13281c;
   --color-warning: #f2c46b;
   --color-warning-soft: #33290f;
   --color-highlight: #50400c;
@@ -50,6 +52,8 @@
   --color-focus: #1d4ed8;
   --color-danger: #b42318;
   --color-danger-soft: #fdf0ef;
+  --color-success: #17703a;
+  --color-success-soft: #e8f5ec;
   --color-warning: #8a4b00;
   --color-warning-soft: #fdf4e3;
   --color-highlight: #fde68a;
@@ -122,6 +126,9 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  // Keeps anything scrolled into view, such as the results heading when it takes focus, clear of
+  // the fault injection banner while that sticks to the top.
+  scroll-padding-top: var(--fault-banner-offset, 0px);
 }
 
 body {

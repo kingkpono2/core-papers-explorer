@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { ApiError } from '../../../core/api/api-error';
 import { CoreApiService } from '../../../core/api/core-api.service';
+import { RequestLog } from '../../../core/diagnostics/request-log';
 import { YearCounts } from '../../../core/models/paper';
 import { PublicationYears } from './publication-years';
 
@@ -34,6 +35,22 @@ describe('PublicationYears', () => {
     expect(read('uav')).toEqual(answer);
 
     expect(countByYear.calls.allArgs()).toEqual([['drone'], ['uav']]);
+  });
+
+  it('logs each answer from memory as a request that was never made', () => {
+    const log = TestBed.inject(RequestLog);
+    read('drone');
+    expect(log.entries()).toEqual([]);
+
+    read('drone');
+    expect(log.entries()).toEqual([
+      jasmine.objectContaining({
+        source: 'memory',
+        method: 'POST',
+        endpoint: '/search/works/aggregate',
+        query: 'drone',
+      }),
+    ]);
   });
 
   it('does not keep failures', () => {

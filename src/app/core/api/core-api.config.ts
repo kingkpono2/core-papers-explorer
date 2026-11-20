@@ -6,6 +6,13 @@ import { RetryPolicy } from './retry-transient';
 export const CORE_MAX_LIMIT = 100;
 export const CORE_MAX_OFFSET = 10_000;
 
+/**
+ * The two endpoints the app uses, below the base URL. The trailing slash on the search path matters:
+ * without it CORE answers with a 301 that costs a rate-limit token.
+ */
+export const SEARCH_PATH = '/search/works/';
+export const AGGREGATE_PATH = '/search/works/aggregate';
+
 export interface CoreApiConfig {
   baseUrl: string;
   apiKey: string;

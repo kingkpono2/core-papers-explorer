@@ -1,0 +1,188 @@
+// A native modal dialog: the browser makes the page behind it inert and puts it on top of
+// everything, so only its size, position and look are set here.
+.drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(34rem, 100vw);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+
+  &[open] {
+    animation: slide-in 180ms ease-out;
+  }
+
+  // ::backdrop does not inherit custom properties in every browser, so the colour is literal.
+  &::backdrop {
+    background: rgb(10 14 20 / 45%);
+  }
+}
+
+// A bottom sheet on phones.
+@media (max-width: 40rem) {
+  .drawer {
+    inset: auto 0 0;
+    width: 100%;
+    height: auto;
+    max-height: 88dvh;
+    border-left: 0;
+    border-top: 1px solid var(--color-border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+
+    &[open] {
+      animation-name: slide-up;
+    }
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(2rem);
+    opacity: 0;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(2rem);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer[open] {
+    animation: none;
+  }
+}
+
+.drawer__panel {
+  display: flex;
+  height: 100%;
+  max-height: inherit;
+  flex-direction: column;
+}
+
+.drawer__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+
+  // Focused on opening so screen readers start at the title; it is not a control.
+  h2 {
+    margin: 0;
+    font-size: var(--text-xl);
+
+    &:focus {
+      outline: none;
+    }
+  }
+}
+
+.drawer__subtitle {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+kbd {
+  padding: 0 0.3em;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.drawer__close {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-3)) 0 0;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-text);
+    background: var(--color-surface-muted);
+  }
+
+  svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+}
+
+.drawer__body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-5) var(--space-8);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+// On wide screens, a lab bench: the figures across the top, the switches and the live requests
+// side by side below them, all in view at once.
+@media (min-width: 64rem) {
+  .drawer {
+    width: min(62rem, 100vw);
+  }
+
+  .drawer__body {
+    grid-template-columns: minmax(0, 21rem) minmax(0, 1fr);
+    gap: var(--space-5) var(--space-6);
+  }
+
+  .seeing,
+  .stats {
+    grid-column: 1 / -1;
+  }
+
+  .break-it {
+    grid-row: 3;
+    grid-column: 1;
+  }
+
+  .timeline {
+    grid-row: 3;
+    grid-column: 2;
+  }
+}
+
+.seeing {
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  background: var(--color-primary-soft);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius);
+
+  h3 {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  p {
+    margin: var(--space-1) 0 0;
+  }
+}
