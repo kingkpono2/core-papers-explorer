@@ -18,4 +18,5 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm test -- --watch=false
+      - run: npm run test:api
       - run: npm run build

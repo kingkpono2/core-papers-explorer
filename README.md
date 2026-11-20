@@ -2,7 +2,7 @@
 
 Author: Kpono Akpabio, assisted by Claude Code
 
-Live demo: https://core-papers-explorer-5l1d.vercel.app
+Live demo: https://core-papers-explorer.vercel.app
 
 A small Angular app for searching open-access research papers through the
 [CORE API v3](https://api.core.ac.uk/docs/v3). It lists matching papers, lets you choose how many
@@ -37,7 +37,8 @@ pagination stops at the 10,000th result and says so.
 - SCSS with CSS custom properties, no UI library
 - Karma + Jasmine for unit tests, running in headless Chrome
 - ESLint (angular-eslint, typescript-eslint) and Prettier
-- GitHub Actions for CI, Vercel for hosting
+- Node's built-in test runner for the serverless function
+- GitHub Actions for CI, Vercel for hosting and one Node.js serverless function in front of CORE
 
 ## Prerequisites
 
@@ -57,16 +58,17 @@ Then open http://localhost:4200. The dev server proxies `/core-api` to the CORE 
 
 ## Commands
 
-| Command                     | What it does                                         |
-| --------------------------- | ---------------------------------------------------- |
-| `npm start`                 | Dev server on http://localhost:4200 with live reload |
-| `npm run start:local`       | Dev server using your local API key (see below)      |
-| `npm run build`             | Production build into `dist/core-papers-explorer`    |
-| `npm test -- --watch=false` | Run unit tests once in headless Chrome               |
-| `npm test`                  | Run unit tests in watch mode                         |
-| `npm run lint`              | Lint TypeScript and templates                        |
-| `npm run format`            | Format the codebase with Prettier                    |
-| `npm run format:check`      | Check formatting without writing (used in CI)        |
+| Command                     | What it does                                          |
+| --------------------------- | ----------------------------------------------------- |
+| `npm start`                 | Dev server on http://localhost:4200 with live reload  |
+| `npm run start:local`       | Dev server using your local API key (see below)       |
+| `npm run build`             | Production build into `dist/core-papers-explorer`     |
+| `npm test -- --watch=false` | Run unit tests once in headless Chrome                |
+| `npm test`                  | Run unit tests in watch mode                          |
+| `npm run test:api`          | Test the serverless function (Node 22, `node --test`) |
+| `npm run lint`              | Lint TypeScript and templates                         |
+| `npm run format`            | Format the codebase with Prettier                     |
+| `npm run format:check`      | Check formatting without writing (used in CI)         |
 
 Tests launch headless Chrome by default. If Karma cannot find a browser, point it at one:
 
@@ -74,10 +76,19 @@ Tests launch headless Chrome by default. If Karma cannot find a browser, point i
 CHROME_BIN=/path/to/chrome npm test -- --watch=false
 ```
 
-## CORE API key (optional)
+## CORE API key
 
-The CORE API works without a key at a lower rate limit. To use your own
-[free API key](https://core.ac.uk/services/api):
+The CORE API works without a key at a lower rate limit. A
+[free API key](https://core.ac.uk/services/api) raises it. Where the key lives depends on where the
+app runs.
+
+**In production the key stays on the server.** The deployed app sends its searches to a Vercel
+function (see [Deployment](#deployment)), which adds the key from the `CORE_API_KEY` environment
+variable. The browser bundle has no key, and the function never sends it back, so it cannot be seen
+in the network tab or the JavaScript.
+
+**Locally the key is optional.** The dev server proxies to CORE directly, without the function. To
+use your own key there:
 
 ```bash
 cp src/environments/environment.local.example.ts src/environments/environment.local.ts
@@ -85,12 +96,10 @@ cp src/environments/environment.local.example.ts src/environments/environment.lo
 npm run start:local
 ```
 
-`environment.local.ts` is gitignored, so the key never ends up in the repository. Note that any key
-used by a browser app is visible to its users, even though requests go through the proxy described
-under [Deployment](#deployment); the deployed demo therefore runs without a key.
-
-When a key is set, an HTTP interceptor sends it as `Authorization: Bearer <key>`, and only on
-requests to the CORE API base URL.
+An HTTP interceptor then sends it as `Authorization: Bearer <key>`, and only on requests to the CORE
+API base URL. `environment.local.ts` is gitignored, so the key never ends up in the repository. This
+is for development only: a key built into a browser app is visible to anyone using it, which is why
+production builds leave `coreApiKey` empty.
 
 ## Rate limits
 
@@ -98,8 +107,11 @@ Anonymous access allows about 10 requests per rate-limit window. When CORE answe
 Requests`, or a request fails with a 5xx or network error, the client retries up to three times
 with exponential backoff (1 s, 2 s, 4 s), spending at most 10 seconds waiting. If the server says
 to wait longer than that, the app stops and shows a message instead. Each attempt times out after
-30 seconds, because cold searches on CORE can be slow; timeouts are not retried. Using an API key
-raises the limit.
+30 seconds, because cold searches on CORE can be slow; timeouts are not retried.
+
+In production two things keep the app well inside the limit: the function sends the server-side API
+key, so CORE no longer applies the anonymous limit shared by everyone behind Vercel's IP addresses,
+and Vercel's CDN answers repeated searches from its cache for five minutes without calling CORE.
 
 ## Deployment
 
@@ -108,25 +120,52 @@ The live demo is hosted on [Vercel](https://vercel.com) and deploys automaticall
 
 **Why a proxy is needed.** CORE's CORS policy only allows `http://localhost:*` and `core.ac.uk`
 origins, so a browser on any other site cannot read its responses. The app therefore never calls
-`api.core.ac.uk` directly. It calls the same-origin path `/core-api/v3/...`, and:
+`api.core.ac.uk` directly. It calls the same-origin path `/core-api/v3/search/works/?q=...`, and:
 
 - in development, the Angular dev server forwards `/core-api/*` to `https://api.core.ac.uk/*`
   (`proxy.conf.json`, wired in `angular.json`);
-- in production, a Vercel rewrite in `vercel.json` does the same on Vercel's edge, server to server,
-  so CORS never applies.
+- in production, `vercel.json` rewrites `/core-api/v3/search/works/` to a Vercel Node.js function,
+  `api/core-search.mjs`, which calls CORE server to server, so CORS never applies.
 
-`vercel.json` also sets the build command and output directory, sends every other path without a
-file extension to `index.html` so deep links work, and adds `X-Content-Type-Options` and
+**The function** (`api/core-search.mjs`, logic in `api/_lib/core-search.mjs`):
+
+- only answers `GET` for the search endpoint, and always calls the same upstream URL,
+  `https://api.core.ac.uk/v3/search/works/`. Other methods get `405`, other `/core-api/` paths `404`,
+  and unknown query parameters, a missing `q` or a `limit`/`offset` beyond CORE's limits `400`,
+  before any request to CORE. It is not an open proxy.
+- forwards the query string unchanged and adds `Authorization: Bearer $CORE_API_KEY` when that
+  environment variable is set. Without it, the function works anonymously. Nothing from the
+  browser's request headers is forwarded.
+- gives CORE 25 seconds (the app waits 30 per attempt) and turns a timeout into `504` and a network
+  failure into `502`, both as JSON `{ "error": "..." }`.
+- passes on CORE's status, JSON body, `Content-Type` and rate-limit headers (`X-RateLimit-*`,
+  `Retry-After`), which the app's retry logic reads.
+- marks successful responses `Cache-Control: public, s-maxage=300, stale-while-revalidate=600`, so
+  Vercel's CDN serves the same search URL from its cache for five minutes and refreshes it in the
+  background for ten more. Errors, including `429`, are `no-store`.
+- never returns or logs the key: only selected headers are passed on, the body is scrubbed of it in
+  case CORE ever echoed it, and errors are logged by name only.
+
+**Setting the key.** In the Vercel project, open Settings → Environment Variables, add
+`CORE_API_KEY` with your [CORE API key](https://core.ac.uk/services/api) for the Production (and,
+if wanted, Preview) environment, and redeploy; environment variables apply to new deployments
+only. The Angular build never reads it; only the function does, at request time.
+
+`vercel.json` also sets the build command and output directory, gives the function a
+`maxDuration` of 30 seconds, sends every other path without a file extension (outside `/api/` and
+`/core-api/`) to `index.html` so deep links work, and adds `X-Content-Type-Options` and
 `Referrer-Policy` headers. A missing file such as `/does-not-exist.js` still gets `index.html` with
 status `200` on Vercel, because Vercel's Angular preset adds its own catch-all after these rules; see
 the [walkthrough](docs/WALKTHROUGH.md#the-404-for-missing-files) for why `"framework": null` does
-not fix that. Leave Vercel's `trailingSlash` option unset: CORE's search endpoint needs
-the trailing slash (`/v3/search/works/`), and `trailingSlash: false` would redirect it away.
+not fix that. Leave Vercel's `trailingSlash` option unset: the search path keeps its trailing slash
+(`/v3/search/works/`), and `trailingSlash: false` would redirect it away from the function.
 
 **Deploy your own copy.** Fork the repository, choose "Add New Project" in Vercel, import the fork
-and accept the detected settings; `vercel.json` supplies the rest. No environment variables are
-needed. Any static host works for the files in `dist/core-papers-explorer/browser`, as long as it
-can proxy `/core-api/*` to `https://api.core.ac.uk/*` and fall back to `index.html`.
+and accept the detected settings; `vercel.json` supplies the rest, and Vercel picks up the function
+in `api/` by itself. `CORE_API_KEY` is optional but recommended, since without it every user of the
+deployment shares CORE's anonymous limit. Another host works if it serves
+`dist/core-papers-explorer/browser` with a fallback to `index.html` and can run the same proxy for
+`/core-api/v3/search/works/`.
 
 ## Project structure
 
@@ -148,10 +187,14 @@ src/
     app.routes.ts      routes
   environments/        build-time configuration, including the optional API key
   testing/             test fixtures shared between specs
+api/
+  core-search.mjs      Vercel function: the production proxy for CORE search
+  _lib/                its logic and tests (node --test); the leading underscore stops Vercel
+                       from deploying these files as functions
 docs/
   WALKTHROUGH.md       design decisions and notes, phase by phase
 proxy.conf.json        dev-server proxy for the CORE API
-vercel.json            Vercel build settings, API rewrite, SPA fallback and headers
+vercel.json            Vercel build settings, function rewrite, SPA fallback and headers
 ```
 
 ## How I built this
