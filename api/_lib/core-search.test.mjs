@@ -14,6 +14,7 @@ import {
   isSearchPath,
   pickResponseHeaders,
   redactKey,
+  serverTiming,
   validateAggregateBody,
   validateQuery,
 } from './core-search.mjs';
@@ -359,7 +360,9 @@ describe('createHandler', () => {
     assert.equal(res.statusCode, 504);
     assert.equal(res.headers['cache-control'], NO_CACHE);
     assert.deepEqual(JSON.parse(res.body), { error: 'CORE did not respond in time.' });
-    assert.deepEqual(logged, ['CORE search request failed: timeout']);
+    assert.deepEqual(logged, [
+      `CORE search request failed: timeout (${res.headers['x-request-id']})`,
+    ]);
   });
 
   it('answers 502 on a network error without logging the key', async () => {
@@ -450,5 +453,121 @@ describe('createHandler', () => {
       assert.equal(res.headers['cache-control'], NO_CACHE);
     }
     assert.equal(calls.length, 0);
+  });
+});
+
+describe('serverTiming', () => {
+  it('gives the time spent on CORE and in the whole function', () => {
+    assert.equal(
+      serverTiming({ coreMs: 412.345, proxyMs: 420.06 }),
+      'core;dur=412.3;desc="CORE API", proxy;dur=420.1;desc="Proxy total"',
+    );
+  });
+
+  it('leaves CORE out when no request was made to it', () => {
+    assert.equal(serverTiming({ coreMs: null, proxyMs: 0.04 }), 'proxy;dur=0;desc="Proxy total"');
+  });
+});
+
+describe('tracing headers', () => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+  /** A clock that returns the given readings in turn. */
+  function clock(...readings) {
+    return () => readings.shift();
+  }
+
+  it('times the request to CORE and the whole function on a success', async () => {
+    const { fetchImpl } = fakeFetch(() => json(200, { results: [] }));
+    const handler = createHandler({
+      fetchImpl,
+      getApiKey: () => KEY,
+      log: silent,
+      // Request in, request to CORE, answer read, response out.
+      now: clock(1_000, 1_002.5, 1_122.5, 1_125),
+      createRequestId: () => 'request-1',
+    });
+
+    const res = await run(handler);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(
+      res.headers['server-timing'],
+      'core;dur=120;desc="CORE API", proxy;dur=125;desc="Proxy total"',
+    );
+    assert.equal(res.headers['x-request-id'], 'request-1');
+  });
+
+  it('times a request rejected before CORE without a core metric', async () => {
+    const { fetchImpl } = fakeFetch(() => json(200, {}));
+    const handler = createHandler({
+      fetchImpl,
+      getApiKey: () => KEY,
+      log: silent,
+      now: clock(50, 50.3),
+      createRequestId: () => 'request-2',
+    });
+
+    const res = await run(handler, { url: '/core-api/v3/search/works/?q=a&callback=x' });
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.headers['server-timing'], 'proxy;dur=0.3;desc="Proxy total"');
+    assert.equal(res.headers['x-request-id'], 'request-2');
+  });
+
+  it('includes the time spent waiting when CORE cannot be reached', async () => {
+    const handler = createHandler({
+      fetchImpl: async () => {
+        throw new TypeError('fetch failed');
+      },
+      getApiKey: () => undefined,
+      log: silent,
+      now: clock(0, 1, 31, 32),
+    });
+
+    const res = await run(handler);
+
+    assert.equal(res.statusCode, 502);
+    assert.equal(
+      res.headers['server-timing'],
+      'core;dur=30;desc="CORE API", proxy;dur=32;desc="Proxy total"',
+    );
+  });
+
+  it('gives every response, success or error, its own random request id', async () => {
+    const { fetchImpl } = fakeFetch((url) =>
+      url.includes('fail')
+        ? new Response('<html>Unavailable</html>', {
+            status: 503,
+            headers: { 'content-type': 'text/html', 'X-RateLimit-Remaining': '0' },
+          })
+        : json(429, { message: 'Too many requests' }, { 'X-RateLimit-Remaining': '0' }),
+    );
+    const handler = createHandler({ fetchImpl, getApiKey: () => KEY, log: silent });
+
+    const responses = [
+      await run(handler),
+      await run(handler, { url: '/core-api/v3/search/works/?q=fail' }),
+      await run(handler, { method: 'DELETE' }),
+      await run(handler, { url: '/core-api/v3/works/1' }),
+      await aggregate(handler, '{"q":"drone","aggregations":["authors"]}'),
+    ];
+
+    assert.deepEqual(
+      responses.map((res) => res.statusCode),
+      [429, 503, 405, 404, 400],
+    );
+    const ids = responses.map((res) => res.headers['x-request-id']);
+    for (const id of ids) {
+      assert.match(id, UUID);
+    }
+    assert.equal(new Set(ids).size, ids.length);
+    for (const res of responses) {
+      assert.match(res.headers['server-timing'], /(^|, )proxy;dur=\d+(\.\d)?;desc="Proxy total"$/);
+      assert.equal(JSON.stringify(res.headers).includes(KEY), false);
+    }
+    // CORE's rate-limit headers are passed on with errors too, so the app can read its budget.
+    assert.equal(responses[0].headers['x-ratelimit-remaining'], '0');
+    assert.equal(responses[1].headers['x-ratelimit-remaining'], '0');
   });
 });

@@ -1,6 +1,7 @@
 // The CORE search proxy behind /core-api/v3/search/works/ on Vercel. Everything that can be tested
 // without a network lives here; api/core-search.mjs only creates the handler. Vercel does not turn
 // files under a folder starting with `_` into functions, so this module is only ever imported.
+import { randomUUID } from 'node:crypto';
 
 /** The only upstream URLs this proxy ever calls. Nothing from the request path reaches them. */
 export const UPSTREAM_URL = 'https://api.core.ac.uk/v3/search/works/';
@@ -199,31 +200,69 @@ export function redactKey(text, apiKey) {
 }
 
 /**
- * @param {import('node:http').ServerResponse} res
- * @param {number} status
- * @param {string} body
- * @param {Record<string, string>} headers
+ * The Server-Timing header: `core` is the time spent on the request to CORE, when there was one,
+ * and `proxy` the whole time in this function. Browsers show it in the network panel, and the app's
+ * Under the hood drawer splits each request's time with it.
+ *
+ * @param {{ coreMs: number | null, proxyMs: number }} timing
  */
-function send(res, status, body, headers) {
-  res.statusCode = status;
-  for (const [name, value] of Object.entries(headers)) {
-    res.setHeader(name, value);
+export function serverTiming({ coreMs, proxyMs }) {
+  const metrics = [`proxy;dur=${roundMs(proxyMs)};desc="Proxy total"`];
+  if (coreMs !== null) {
+    metrics.unshift(`core;dur=${roundMs(coreMs)};desc="CORE API"`);
   }
-  res.end(body);
+  return metrics.join(', ');
+}
+
+/** @param {number} ms */
+function roundMs(ms) {
+  return Math.max(0, Math.round(ms * 10) / 10);
 }
 
 /**
+ * Writes the response to one request. Every response, success or error, gets a random
+ * X-Request-Id and Server-Timing, so a slow or failed search can be followed from the browser to
+ * the function's log.
+ *
  * @param {import('node:http').ServerResponse} res
- * @param {number} status
- * @param {string} error
- * @param {Record<string, string>} [headers]
+ * @param {{ now: () => number, requestId: string }} options
  */
-function sendError(res, status, error, headers = {}) {
-  send(res, status, JSON.stringify({ error }), {
-    ...headers,
-    'content-type': JSON_TYPE,
-    'cache-control': NO_CACHE,
-  });
+function createReply(res, { now, requestId }) {
+  const startedAt = now();
+  return {
+    requestId,
+    /** Time spent on the request to CORE, once it was made. @type {number | null} */
+    coreMs: null,
+
+    /**
+     * @param {number} status
+     * @param {string} body
+     * @param {Record<string, string>} headers
+     */
+    send(status, body, headers) {
+      res.statusCode = status;
+      const timing = serverTiming({ coreMs: this.coreMs, proxyMs: now() - startedAt });
+      for (const [name, value] of Object.entries(headers)) {
+        res.setHeader(name, value);
+      }
+      res.setHeader('server-timing', timing);
+      res.setHeader('x-request-id', requestId);
+      res.end(body);
+    },
+
+    /**
+     * @param {number} status
+     * @param {string} error
+     * @param {Record<string, string>} [headers]
+     */
+    error(status, error, headers = {}) {
+      this.send(status, JSON.stringify({ error }), {
+        ...headers,
+        'content-type': JSON_TYPE,
+        'cache-control': NO_CACHE,
+      });
+    },
+  };
 }
 
 /**
@@ -234,6 +273,8 @@ function sendError(res, status, error, headers = {}) {
  *   getApiKey?: () => string | undefined,
  *   timeoutMs?: number,
  *   log?: Pick<Console, 'error'>,
+ *   now?: () => number,
+ *   createRequestId?: () => string,
  * }} [options]
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => Promise<void>}
  */
@@ -242,8 +283,11 @@ export function createHandler({
   getApiKey = () => process.env.CORE_API_KEY,
   timeoutMs = UPSTREAM_TIMEOUT_MS,
   log = console,
+  now = () => performance.now(),
+  createRequestId = () => randomUUID(),
 } = {}) {
   return async function coreSearch(req, res) {
+    const reply = createReply(res, { now, requestId: createRequestId() });
     const rawUrl = req.url ?? '/';
     const queryStart = rawUrl.indexOf('?');
     const pathname = new URL(rawUrl, 'http://localhost').pathname;
@@ -253,40 +297,41 @@ export function createHandler({
     let upstreamBody;
     if (isSearchPath(pathname)) {
       if (req.method !== 'GET') {
-        return sendError(res, 405, 'Only GET is supported.', { allow: 'GET' });
+        return reply.error(405, 'Only GET is supported.', { allow: 'GET' });
       }
       const validation = validateQuery(rawQuery);
       if (!validation.ok) {
-        return sendError(res, validation.status, validation.error);
+        return reply.error(validation.status, validation.error);
       }
       upstreamUrl = `${UPSTREAM_URL}?${rawQuery}`;
     } else if (isAggregatePath(pathname)) {
       if (req.method !== 'POST') {
-        return sendError(res, 405, 'Only POST is supported.', { allow: 'POST' });
+        return reply.error(405, 'Only POST is supported.', { allow: 'POST' });
       }
       if (rawQuery) {
-        return sendError(res, 400, 'Send the aggregation in the body, not the URL.');
+        return reply.error(400, 'Send the aggregation in the body, not the URL.');
       }
       if (!/^application\/json\b/i.test(req.headers?.['content-type'] ?? '')) {
-        return sendError(res, 415, 'The body must be sent as application/json.');
+        return reply.error(415, 'The body must be sent as application/json.');
       }
       const text = await readBody(req, MAX_BODY_BYTES);
       if (text === null) {
-        return sendError(res, 413, 'The body is too large.');
+        return reply.error(413, 'The body is too large.');
       }
       const validation = validateAggregateBody(text);
       if (!validation.ok) {
-        return sendError(res, validation.status, validation.error);
+        return reply.error(validation.status, validation.error);
       }
       upstreamUrl = UPSTREAM_AGGREGATE_URL;
       upstreamBody = JSON.stringify(validation.body);
     } else {
-      return sendError(res, 404, 'Not found.');
+      return reply.error(404, 'Not found.');
     }
 
     const apiKey = getApiKey();
     let upstream;
     let body;
+    const upstreamStartedAt = now();
     try {
       upstream = await fetchImpl(upstreamUrl, {
         method: req.method,
@@ -300,14 +345,16 @@ export function createHandler({
         signal: AbortSignal.timeout(timeoutMs),
       });
       body = await upstream.text();
+      reply.coreMs = now() - upstreamStartedAt;
     } catch (error) {
+      reply.coreMs = now() - upstreamStartedAt;
       const name = error instanceof Error ? error.name : 'Error';
       const timedOut = name === 'TimeoutError' || name === 'AbortError';
-      // Only the error's name: never the request, its headers or the key.
-      log.error(`CORE search request failed: ${timedOut ? 'timeout' : name}`);
+      // Only the error's name and the request id: never the request, its headers or the key.
+      log.error(`CORE search request failed: ${timedOut ? 'timeout' : name} (${reply.requestId})`);
       return timedOut
-        ? sendError(res, 504, 'CORE did not respond in time.')
-        : sendError(res, 502, 'Could not reach CORE.');
+        ? reply.error(504, 'CORE did not respond in time.')
+        : reply.error(502, 'Could not reach CORE.');
     }
 
     const headers = pickResponseHeaders(upstream.headers);
@@ -317,11 +364,11 @@ export function createHandler({
       if (!isJson(body)) {
         delete headers['content-type'];
         const status = upstream.status >= 400 ? upstream.status : 502;
-        return sendError(res, status, `CORE answered ${upstream.status} without JSON.`, headers);
+        return reply.error(status, `CORE answered ${upstream.status} without JSON.`, headers);
       }
       headers['content-type'] = JSON_TYPE;
     }
-    send(res, upstream.status, redactKey(body, apiKey), {
+    reply.send(upstream.status, redactKey(body, apiKey), {
       ...headers,
       'cache-control': cacheControlFor(upstream.status, req.method),
       // Says whether a key was configured, never the key itself; handy when checking a deployment.

@@ -118,7 +118,7 @@ Engineering
 - A Vercel function in front of CORE that keeps the API key on the server, lets the CDN cache
   searches for five minutes and only allows the two endpoints the app uses (see
   [Deployment](#deployment))
-- 404 unit tests (Karma) and 34 tests for the serverless function (`node --test`), run with lint,
+- 404 unit tests (Karma) and 40 tests for the serverless function (`node --test`), run with lint,
   format check and a production build on every push by GitHub Actions
 - Deployed on Vercel with preview deployments for branches
 
@@ -364,8 +364,14 @@ origins, so a browser on any other site cannot read its responses. The app there
 - marks successful searches `Cache-Control: public, s-maxage=300, stale-while-revalidate=600`, so
   Vercel's CDN serves the same search URL from its cache for five minutes and refreshes it in the
   background for ten more. Errors, including `429`, and aggregation answers are `no-store`.
+- adds two headers to every response, success or error: `Server-Timing`, with `core;dur=` for the
+  time spent on the request to CORE (when there was one) and `proxy;dur=` for the whole time in the
+  function, and a random `X-Request-Id`, which is also in the log line when CORE cannot be reached.
+  Vercel's CDN adds `x-vercel-cache` (`HIT`, `MISS` or `STALE`); a response served from the cache
+  keeps the headers of the request that filled it. Locally the dev server proxies straight to CORE,
+  so there is no function and no CDN, and none of these headers.
 - never returns or logs the key: only selected headers are passed on, the body is scrubbed of it in
-  case CORE ever echoed it, and errors are logged by name only.
+  case CORE ever echoed it, and errors are logged by name and request id only.
 
 **Setting the key.** In the Vercel project, open Settings → Environment Variables, add
 `CORE_API_KEY` with your [CORE API key](https://core.ac.uk/services/api) for the Production (and,
