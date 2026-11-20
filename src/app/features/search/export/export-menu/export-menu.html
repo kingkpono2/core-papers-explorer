@@ -1,0 +1,23 @@
+<button
+  #toggle
+  type="button"
+  class="button button--secondary button--small toggle"
+  aria-controls="export-options"
+  [attr.aria-expanded]="open()"
+  (click)="open.set(!open())"
+>
+  Export
+  <svg class="caret" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+    <path d="M2.5 4.5 6 8l3.5-3.5" />
+  </svg>
+</button>
+<div id="export-options" class="options" [hidden]="!open()">
+  @let count = papers().length;
+  <p class="options__label">This page ({{ count }} {{ count === 1 ? 'paper' : 'papers' }})</p>
+  <button type="button" class="option" (click)="export('csv')">
+    CSV <span class="option__hint">for spreadsheets</span>
+  </button>
+  <button type="button" class="option" (click)="export('bibtex')">
+    BibTeX <span class="option__hint">for reference managers</span>
+  </button>
+</div>

@@ -24,6 +24,7 @@ import { Pagination } from '../../../shared/ui/pagination/pagination';
 import { PaperCard } from '../../../shared/ui/paper-card/paper-card';
 import { SkeletonCard } from '../../../shared/ui/skeleton-card/skeleton-card';
 import { ChartSearch, YearChart } from '../chart/year-chart/year-chart';
+import { ExportMenu } from '../export/export-menu/export-menu';
 import { PageSizePreference } from '../page-size-preference';
 import { MAX_RESULTS, lastPage, pageOffset, resultRange } from '../paging';
 import { toCoreQuery } from '../query/core-query';
@@ -56,6 +57,7 @@ const SKELETON_COUNT = 3;
     DecimalPipe,
     EmptyState,
     ErrorState,
+    ExportMenu,
     Pagination,
     PaperCard,
     RouterLink,

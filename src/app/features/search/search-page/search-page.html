@@ -22,7 +22,18 @@
     [attr.aria-busy]="current.status === 'loading'"
   >
     <header class="results__header" [class.visually-hidden]="current.status === 'idle'">
-      <h2 id="results-heading" #resultsHeading tabindex="-1">Results</h2>
+      <div class="results__title">
+        <h2 id="results-heading" #resultsHeading tabindex="-1">Results</h2>
+        @if (current.status === 'success' && current.result.papers.length) {
+          <div class="results__actions">
+            <app-export-menu
+              [papers]="current.result.papers"
+              [query]="current.params.query"
+              [page]="current.params.page"
+            />
+          </div>
+        }
+      </div>
       <p class="summary" aria-live="polite">{{ summary() }}</p>
     </header>
 

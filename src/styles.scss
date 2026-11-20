@@ -143,6 +143,12 @@ button {
     background: var(--color-primary-hover);
   }
 
+  &--small {
+    min-height: 2.5rem;
+    padding: var(--space-1) var(--space-4);
+    font-size: var(--text-sm);
+  }
+
   &--secondary {
     color: var(--color-primary);
     background: var(--color-surface);

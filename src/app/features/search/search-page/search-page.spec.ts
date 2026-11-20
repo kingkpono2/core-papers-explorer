@@ -237,6 +237,15 @@ describe('SearchPage', () => {
       expect(summary()).toBe('No papers found for “qwxzv”');
       expect(el.querySelector('app-empty-state')?.textContent).toContain('Nothing matched “qwxzv”');
       expect(el.querySelector('ol')).toBeNull();
+      expect(el.querySelector('app-export-menu')).toBeNull();
+    });
+
+    it('offers to export the papers on the page', async () => {
+      await submit('drone');
+      expect(el.querySelector('app-export-menu')).toBeNull();
+
+      await respond(resultOf(30, papers(10)));
+      expect(el.querySelector('app-export-menu')?.textContent).toContain('This page (10 papers)');
     });
 
     it('shows the error and retries the same search', async () => {
