@@ -1,0 +1,69 @@
+<nav aria-label="Pages">
+  <ul class="pages" role="list">
+    <li>
+      @if (page() > 1) {
+        <a
+          class="page step"
+          rel="prev"
+          [routerLink]="[]"
+          [queryParams]="queryParams(page() - 1)"
+          queryParamsHandling="merge"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="m15 6-6 6 6 6" />
+          </svg>
+          <span [class.visually-hidden]="compact()">Previous</span>
+        </a>
+      } @else {
+        <a class="page step" role="link" aria-disabled="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="m15 6-6 6 6 6" />
+          </svg>
+          <span [class.visually-hidden]="compact()">Previous</span>
+        </a>
+      }
+    </li>
+
+    @for (item of items(); track $index) {
+      <li>
+        @if (item === null) {
+          <span class="gap" aria-hidden="true">…</span>
+        } @else {
+          <a
+            class="page"
+            [routerLink]="[]"
+            [queryParams]="queryParams(item)"
+            queryParamsHandling="merge"
+            [attr.aria-current]="item === page() ? 'page' : null"
+          >
+            <span class="visually-hidden">Page</span> {{ item | number }}
+          </a>
+        }
+      </li>
+    }
+
+    <li>
+      @if (page() < lastPage()) {
+        <a
+          class="page step"
+          rel="next"
+          [routerLink]="[]"
+          [queryParams]="queryParams(page() + 1)"
+          queryParamsHandling="merge"
+        >
+          <span [class.visually-hidden]="compact()">Next</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        </a>
+      } @else {
+        <a class="page step" role="link" aria-disabled="true">
+          <span [class.visually-hidden]="compact()">Next</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        </a>
+      }
+    </li>
+  </ul>
+</nav>

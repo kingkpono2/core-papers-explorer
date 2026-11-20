@@ -14,6 +14,10 @@ charts how all matching papers are distributed over time.
 ## Features
 
 - Keyword search against CORE, including boolean queries
+- A results-per-page choice (10, 25, 50 or 100), remembered for the next visit
+- Pagination with Previous/Next and page numbers ("Showing 26–50 of 71,213"), compact on phones
+- The query, page and page size live in the URL, so searches can be bookmarked and shared and the
+  browser's Back and Forward buttons step through them
 - Paper cards with title, authors, year, journal or publisher, document type, language, citation
   count and a collapsible abstract, plus links to the DOI, the full-text PDF and the CORE page
 - Loading skeletons, a "search to begin" screen with example queries, a no-results screen and
@@ -21,6 +25,10 @@ charts how all matching papers are distributed over time.
 - Responsive layout from phone to desktop, keyboard friendly, with screen reader announcements for
   result counts and focus moved to the results after each search
 - Retries with backoff on rate limits and transient failures, and a 30 second timeout per request
+- One request per user action; repeated or cosmetic URL changes never trigger a second search
+
+CORE serves at most 100 results per request and only the first 10,000 results of any search, so
+pagination stops at the 10,000th result and says so.
 
 ## Tech stack
 
@@ -109,7 +117,10 @@ origins, so a browser on any other site cannot read its responses. The app there
 
 `vercel.json` also sets the build command and output directory, sends every other path without a
 file extension to `index.html` so deep links work, and adds `X-Content-Type-Options` and
-`Referrer-Policy` headers. Leave Vercel's `trailingSlash` option unset: CORE's search endpoint needs
+`Referrer-Policy` headers. A missing file such as `/does-not-exist.js` still gets `index.html` with
+status `200` on Vercel, because Vercel's Angular preset adds its own catch-all after these rules; see
+the [walkthrough](docs/WALKTHROUGH.md#the-404-for-missing-files) for why `"framework": null` does
+not fix that. Leave Vercel's `trailingSlash` option unset: CORE's search endpoint needs
 the trailing slash (`/v3/search/works/`), and `trailingSlash: false` would redirect it away.
 
 **Deploy your own copy.** Fork the repository, choose "Add New Project" in Vercel, import the fork
@@ -128,9 +139,11 @@ src/
       layout/          site header and footer
       models/          raw CORE API types, the app's Paper model and the mapper between them
     features/
-      search/          the search page (lazy loaded)
+      search/          the search page (lazy loaded), URL params, paging maths, page size
+                       preference
     shared/
-      ui/              presentational components: paper card, skeleton, empty and error states
+      ui/              presentational components: paper card, skeleton, empty and error states,
+                       pagination
     app.config.ts      application providers
     app.routes.ts      routes
   environments/        build-time configuration, including the optional API key
@@ -151,7 +164,7 @@ Design decisions are explained in [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md).
 - [x] 1. Project setup: Angular 20, strict mode, lint, format, CI, app shell
 - [x] 2. CORE API layer: typed models, service, timeouts, retry with backoff on 429, error handling
 - [x] 3. Paper cards with loading, empty and error states; responsive and accessible
-- [ ] 4. Results-per-page control, pagination and state in the URL
+- [x] 4. Results-per-page control, pagination and state in the URL
 - [ ] 5. Boolean keyword search with validation, help and search history
 - [ ] 6. Chart of papers per year across all matching results
 - [ ] 7. Extras: response cache, CSV/BibTeX export, dark mode
