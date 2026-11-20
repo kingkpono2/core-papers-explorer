@@ -1,5 +1,35 @@
-// Design tokens. Components only use these semantic names, so a dark theme is a matter of
-// redefining the colour tokens under one selector.
+// Design tokens. Components only use these semantic names, so the dark theme only redefines the
+// colour tokens. Every text colour meets WCAG AA (4.5:1) on the backgrounds it is used on, in both
+// themes, and borders, focus rings and chart bars meet 3:1.
+@mixin dark-theme {
+  color-scheme: dark;
+
+  --color-bg: #0f1419;
+  --color-surface: #171d26;
+  --color-surface-muted: #1f2732;
+  --color-text: #e6eaf0;
+  --color-text-muted: #a3aebd;
+  --color-border: #2e3846;
+  --color-border-strong: #6f7c8e;
+  --color-primary: #8ab4ff;
+  --color-primary-hover: #b3cdff;
+  --color-primary-soft: #1c2a45;
+  --color-primary-contrast: #0b1220;
+  --color-focus: #8ab4ff;
+  --color-danger: #ff9a8f;
+  --color-danger-soft: #3a1f1d;
+  --color-warning: #f2c46b;
+  --color-warning-soft: #33290f;
+  --color-highlight: #6a5414;
+  --color-skeleton: #232c38;
+  --color-skeleton-highlight: #2d3745;
+  --color-header-bg: #15233f;
+  --color-header-text: #e6eaf0;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%), 0 1px 3px rgb(0 0 0 / 30%);
+  --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 45%), 0 2px 4px -2px rgb(0 0 0 / 35%);
+}
+
 :root {
   color-scheme: light;
 
@@ -22,6 +52,8 @@
   --color-highlight: #fde68a;
   --color-skeleton: #e3e8ee;
   --color-skeleton-highlight: #f1f4f7;
+  --color-header-bg: #1d4ed8;
+  --color-header-text: #ffffff;
 
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -56,6 +88,17 @@
 
   --content-width: 72rem;
   --reading-width: 52rem;
+}
+
+// The system setting applies unless the user picked a theme in the header (see ThemePreference).
+:root[data-theme='dark'] {
+  @include dark-theme;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    @include dark-theme;
+  }
 }
 
 *,
