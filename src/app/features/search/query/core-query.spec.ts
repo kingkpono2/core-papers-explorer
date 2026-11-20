@@ -1,4 +1,11 @@
-import { coreQueryAdjustment, narrowQuery, toCoreQuery } from './core-query';
+import { analyseQuery } from './query-analyser';
+import {
+  anyOfClause,
+  coreQueryAdjustment,
+  narrowQuery,
+  refineQuery,
+  toCoreQuery,
+} from './core-query';
 
 describe('toCoreQuery', () => {
   const cases: [string, string][] = [
@@ -100,5 +107,66 @@ describe('narrowQuery', () => {
 
   it('accepts other clauses, such as the bucket for earlier years', () => {
     expect(narrowQuery('drone', 'yearPublished<2003')).toBe('drone AND yearPublished<2003');
+  });
+});
+
+describe('refineQuery', () => {
+  const topic = '(parcel OR "last mile")';
+
+  const cases: [string, string][] = [
+    ['drone AND delivery', 'drone AND delivery AND (parcel OR "last mile")'],
+    [
+      '(drone AND (package OR delivery))',
+      'drone AND (package OR delivery) AND (parcel OR "last mile")',
+    ],
+    ['drone OR uav', '(drone OR uav) AND (parcel OR "last mile")'],
+    ['"drone delivery"', '("drone delivery") AND (parcel OR "last mile")'],
+    ['drone AND yearPublished>=2020', 'drone AND yearPublished>=2020 AND (parcel OR "last mile")'],
+  ];
+
+  for (const [query, expected] of cases) {
+    it(`refines ${query} to ${expected}`, () => {
+      expect(refineQuery(query, topic)).toBe(expected);
+    });
+  }
+
+  it('keeps every OR group where CORE reads it, including the brief’s example', () => {
+    for (const query of [
+      '(drone AND (package OR delivery))',
+      'drone OR uav',
+      'drone AND delivery',
+    ]) {
+      const refined = refineQuery(query, topic)!;
+      const nested = analyseQuery(refined).diagnostics.filter((d) => d.code === 'nested-or-group');
+
+      expect(nested).withContext(refined).toEqual([]);
+    }
+  });
+
+  it('refuses when bracketing the query would hide an OR group from CORE', () => {
+    expect(refineQuery('drone OR (package OR delivery)', topic)).toBeNull();
+  });
+
+  it('is what narrowQuery builds on, which also leaves year filters alone', () => {
+    expect(narrowQuery('drone AND yearPublished>=2020', 'yearPublished:2021')).toBeNull();
+    expect(refineQuery('drone', 'yearPublished:2021')).toBe(
+      narrowQuery('drone', 'yearPublished:2021'),
+    );
+  });
+});
+
+describe('anyOfClause', () => {
+  it('joins words and quoted phrases with OR in brackets', () => {
+    expect(anyOfClause(['parcel', 'last mile'])).toBe('(parcel OR "last mile")');
+  });
+
+  it('needs no brackets for one term, and drops repeats', () => {
+    expect(anyOfClause(['parcel', ' Parcel '])).toBe('parcel');
+  });
+
+  it('leaves out anything CORE could read as syntax', () => {
+    expect(anyOfClause(['and', 'title:drone', 'c++', '"quoted"', 'truck'])).toBe('truck');
+    expect(anyOfClause(['or', '*'])).toBeNull();
+    expect(anyOfClause([])).toBeNull();
   });
 });
