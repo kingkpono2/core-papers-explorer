@@ -12,6 +12,10 @@
   </app-search-bar>
 </section>
 
+@if (showTour()) {
+  <app-reviewer-tour class="tour" (helpRequested)="openHelp()" (dismissed)="dismissTour()" />
+}
+
 @let current = state();
 <div class="layout">
   <app-year-chart class="chart" [search]="chartSearch()" (narrowed)="searchFor($event)" />

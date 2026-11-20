@@ -35,6 +35,8 @@ Search
 - The query, page and page size live in the URL, so searches can be bookmarked and shared and Back
   and Forward step through them; the tab title shows the query ("drone — CORE Papers Explorer"),
   and unknown paths lead back to the search
+- A dismissible reviewer quick tour on the start screen, with one-click steps to the features
+  that go beyond the brief
 - A Share button (the system share sheet on phones, copy to clipboard elsewhere) and `/` to jump to
   the search box
 - Export of the current page as CSV (RFC 4180, guarded against spreadsheet formula injection) or
@@ -75,7 +77,7 @@ Engineering
 - A Vercel function in front of CORE that keeps the API key on the server, lets the CDN cache
   searches for five minutes and only allows the two endpoints the app uses (see
   [Deployment](#deployment))
-- 331 unit tests (Karma) and 34 tests for the serverless function (`node --test`), run with lint,
+- 342 unit tests (Karma) and 34 tests for the serverless function (`node --test`), run with lint,
   format check and a production build on every push by GitHub Actions
 - Deployed on Vercel with preview deployments for branches
 

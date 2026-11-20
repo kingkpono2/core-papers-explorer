@@ -1,0 +1,36 @@
+<section class="tour" aria-labelledby="reviewer-tour-heading">
+  <div class="tour__header">
+    <h2 id="reviewer-tour-heading">Reviewer quick tour</h2>
+    <button
+      type="button"
+      class="tour__close"
+      aria-label="Dismiss the reviewer quick tour"
+      title="Dismiss"
+      (click)="dismissed.emit()"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M6 6l12 12M18 6 6 18" />
+      </svg>
+    </button>
+  </div>
+  <p class="tour__intro">Assessing this app? These steps show what it does beyond the brief.</p>
+  <ol class="tour__steps">
+    <li>
+      <a class="tour__action" routerLink="/" [queryParams]="{ q: example }"
+        >Run the brief’s example</a
+      >
+      <span class="tour__detail">
+        CORE ignores the nested OR group in <code>{{ example }}</code
+        >; a note by the result count says how the app corrects it.
+      </span>
+    </li>
+    <li>
+      <button type="button" class="tour__action" (click)="helpRequested.emit()">
+        See how queries are checked
+      </button>
+      <span class="tour__detail">
+        Syntax, CORE’s quirks and the mistakes caught before a query is sent.
+      </span>
+    </li>
+  </ol>
+</section>
