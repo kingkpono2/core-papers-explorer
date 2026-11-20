@@ -1,11 +1,12 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, catchError, map, throwError, timeout } from 'rxjs';
+import { Observable, catchError, defer, map, throwError, timeout } from 'rxjs';
 import { CoreAggregateResponse, CoreSearchResponse } from '../models/core-api.models';
 import { SearchRequest, SearchResult, YearCounts } from '../models/paper';
 import { toSearchResult, toYearCounts } from '../models/paper.mapper';
 import { toApiError } from './api-error';
-import { CORE_API_CONFIG } from './core-api.config';
+import { AGGREGATE_PATH, CORE_API_CONFIG, SEARCH_PATH } from './core-api.config';
+import { REQUEST_TRACE, RequestTrace } from './request-trace';
 import { retryTransient } from './retry-transient';
 
 @Injectable({ providedIn: 'root' })
@@ -22,15 +23,15 @@ export class CoreApiService {
       // Full text can be megabytes per paper and is never shown.
       .set('exclude', 'fullText');
 
-    // The trailing slash matters: without it CORE answers with a 301 that costs a rate-limit token.
-    return this.http
-      .get<CoreSearchResponse>(`${this.config.baseUrl}/search/works/`, { params })
-      .pipe(
-        timeout(this.config.timeoutMs),
-        retryTransient(this.config.retry),
-        map(toSearchResult),
-        catchError((error: unknown) => throwError(() => toApiError(error))),
-      );
+    return this.send((context) =>
+      this.http.get<CoreSearchResponse>(`${this.config.baseUrl}${SEARCH_PATH}`, {
+        params,
+        context,
+      }),
+    ).pipe(
+      map(toSearchResult),
+      catchError((error: unknown) => throwError(() => toApiError(error))),
+    );
   }
 
   /**
@@ -38,16 +39,29 @@ export class CoreApiService {
    * matches in one request. Errors are always emitted as `ApiError`.
    */
   countByYear(query: string): Observable<YearCounts> {
-    return this.http
-      .post<CoreAggregateResponse>(`${this.config.baseUrl}/search/works/aggregate`, {
-        q: query,
-        aggregations: ['yearPublished'],
-      })
-      .pipe(
+    return this.send((context) =>
+      this.http.post<CoreAggregateResponse>(
+        `${this.config.baseUrl}${AGGREGATE_PATH}`,
+        { q: query, aggregations: ['yearPublished'] },
+        { context },
+      ),
+    ).pipe(
+      map(toYearCounts),
+      catchError((error: unknown) => throwError(() => toApiError(error))),
+    );
+  }
+
+  /**
+   * Sends one logical request with the timeout and retry policy. Its attempts share a trace, in a
+   * context of their own for each subscription, so Under the hood can link retries to the request.
+   */
+  private send<T>(request: (context: HttpContext) => Observable<T>): Observable<T> {
+    return defer(() => {
+      const trace = new RequestTrace();
+      return request(new HttpContext().set(REQUEST_TRACE, trace)).pipe(
         timeout(this.config.timeoutMs),
-        retryTransient(this.config.retry),
-        map(toYearCounts),
-        catchError((error: unknown) => throwError(() => toApiError(error))),
+        retryTransient(this.config.retry, trace),
       );
+    });
   }
 }

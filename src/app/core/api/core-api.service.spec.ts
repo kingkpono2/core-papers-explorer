@@ -7,6 +7,7 @@ import { SearchResult, YearCounts } from '../models/paper';
 import { ApiError } from './api-error';
 import { CORE_API_CONFIG, CoreApiConfig } from './core-api.config';
 import { CoreApiService } from './core-api.service';
+import { REQUEST_TRACE } from './request-trace';
 
 const config: CoreApiConfig = {
   baseUrl: 'https://api.test/v3',
@@ -155,6 +156,21 @@ describe('CoreApiService', () => {
     jasmine.clock().tick(10_000);
     http.expectNone(isSearch);
     expect(error?.kind).toBe('bad-query');
+  });
+
+  it('gives the attempts of a request one trace, and every request its own', () => {
+    search();
+    const first = http.expectOne(isSearch);
+    const trace = first.request.context.get(REQUEST_TRACE);
+    first.flush(null, { status: 503, statusText: 'Service Unavailable' });
+    jasmine.clock().tick(1_000);
+    const retried = http.expectOne(isSearch);
+
+    expect(retried.request.context.get(REQUEST_TRACE)).toBe(trace);
+    retried.flush(okResponse);
+
+    search('robots');
+    expect(http.expectOne(isSearch).request.context.get(REQUEST_TRACE)).not.toBe(trace);
   });
 
   it('times out and cancels a slow request', () => {

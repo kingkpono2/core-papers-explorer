@@ -7,6 +7,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { Subject } from 'rxjs';
 import { ApiError } from '../../../core/api/api-error';
 import { CoreApiService } from '../../../core/api/core-api.service';
+import { RequestLog } from '../../../core/diagnostics/request-log';
 import { Paper, SearchResult, YearCounts } from '../../../core/models/paper';
 import { makePaper } from '../../../../testing/paper.fixture';
 import { PAGE_SIZE_STORAGE_KEY } from '../page-size-preference';
@@ -441,6 +442,9 @@ describe('SearchPage', () => {
       expect(searchWorks).toHaveBeenCalledTimes(2);
       expect(results().textContent).toContain('First paper');
       expect(summary()).toBe('Showing 1 of 1 paper for “first”');
+      expect(TestBed.inject(RequestLog).entries()[0]).toEqual(
+        jasmine.objectContaining({ source: 'memory', query: 'first' }),
+      );
     });
 
     it('asks CORE again on Back when the earlier search failed', async () => {
