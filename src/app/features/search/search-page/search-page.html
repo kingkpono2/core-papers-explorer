@@ -1,32 +1,15 @@
 <section class="panel" aria-labelledby="search-heading">
   <h1 id="search-heading">Search research papers</h1>
-  <form class="search-form" role="search" (submit)="search($event)">
-    <label for="query">Keywords</label>
-    <div class="search-form__row">
-      <input
-        #queryInput
-        id="query"
-        type="search"
-        name="query"
-        autocomplete="off"
-        [placeholder]="exampleQuery"
-        [value]="query()"
-        (input)="query.set(queryInput.value)"
-      />
-      <button type="submit" class="button">Search</button>
+  <app-search-bar [query]="params().query" (searched)="searchFor($event)">
+    <div class="page-size">
+      <label for="page-size">Results per page</label>
+      <select #pageSize id="page-size" name="size" (change)="changePageSize(pageSize.value)">
+        @for (size of pageSizes; track size) {
+          <option [value]="size" [selected]="size === params().size">{{ size }}</option>
+        }
+      </select>
     </div>
-    <div class="search-form__footer">
-      <p class="hint">Combine terms with AND, OR, NOT and parentheses.</p>
-      <div class="page-size">
-        <label for="page-size">Results per page</label>
-        <select #pageSize id="page-size" name="size" (change)="changePageSize(pageSize.value)">
-          @for (size of pageSizes; track size) {
-            <option [value]="size" [selected]="size === params().size">{{ size }}</option>
-          }
-        </select>
-      </div>
-    </div>
-  </form>
+  </app-search-bar>
 </section>
 
 @let current = state();
@@ -50,6 +33,11 @@
         Search millions of open-access papers from CORE by keyword.
       </app-empty-state>
     }
+    @case ('invalid') {
+      <app-empty-state heading="Check the search">
+        This search has a problem, shown under the search box, so it was not sent to CORE.
+      </app-empty-state>
+    }
     @case ('loading') {
       <div class="stack">
         @for (skeleton of skeletons; track skeleton) {
@@ -68,7 +56,7 @@
         <ol class="stack paper-list" role="list" [start]="result.offset + 1">
           @for (paper of result.papers; track paper.id) {
             <li>
-              <app-paper-card [paper]="paper" />
+              <app-paper-card [paper]="paper" [highlight]="highlightTerms()" />
             </li>
           }
         </ol>

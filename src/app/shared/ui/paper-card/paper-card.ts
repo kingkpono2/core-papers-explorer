@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, linkedSignal } from '@angular/core';
 import { Paper } from '../../../core/models/paper';
+import { Highlight } from '../highlight/highlight';
 
 const VISIBLE_AUTHORS = 3;
 // Roughly three lines on a phone. Shorter abstracts are shown in full, without a toggle.
@@ -10,13 +11,15 @@ let nextId = 0;
 
 @Component({
   selector: 'app-paper-card',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, Highlight],
   templateUrl: './paper-card.html',
   styleUrl: './paper-card.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PaperCard {
   readonly paper = input.required<Paper>();
+  /** Search terms to mark in the title and abstract. */
+  readonly highlight = input<readonly string[]>([]);
 
   protected readonly titleId = `paper-card-${nextId}-title`;
   protected readonly abstractId = `paper-card-${nextId++}-abstract`;

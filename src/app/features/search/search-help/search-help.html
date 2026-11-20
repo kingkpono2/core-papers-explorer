@@ -1,0 +1,72 @@
+<section class="help" aria-labelledby="search-help-heading">
+  <h2 id="search-help-heading" class="heading">How to search</h2>
+
+  <h3>Operators</h3>
+  <table class="syntax">
+    <thead>
+      <tr>
+        <th scope="col">Write</th>
+        <th scope="col">To find</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (row of operators; track row[0]) {
+        <tr>
+          <td>
+            <code>{{ row[0] }}</code>
+          </td>
+          <td>{{ row[1] }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  <h3>Fields</h3>
+  <p>
+    Limit a word or phrase to one field, as in <code>title:drone</code> or
+    <code>authors:"Jane Doe"</code>. Compare years with <code>&gt;</code>, <code>&gt;=</code>,
+    <code>&lt;</code> and <code>&lt;=</code>: <code>yearPublished&gt;=2019</code>. For a range of
+    years, combine two: <code>yearPublished&gt;=2019 AND yearPublished&lt;=2021</code>.
+  </p>
+  <p id="search-help-fields">Insert a field where the cursor is:</p>
+  <ul class="chips" aria-labelledby="search-help-fields">
+    @for (field of fields; track field) {
+      <li>
+        <button type="button" class="chip" (click)="fieldSelected.emit(field)">{{ field }}</button>
+      </li>
+    }
+  </ul>
+
+  <h3>Good to know</h3>
+  <ul class="notes">
+    <li>
+      CORE treats lowercase <code>and</code>, <code>or</code> and <code>not</code> as operators.
+    </li>
+    <li>
+      Ranges in square brackets, such as <code>[2019 TO 2021]</code>, make CORE fail. Use two
+      comparisons instead.
+    </li>
+    <li>
+      CORE ignores an OR group inside other brackets, as in
+      <code>(drone AND (package OR delivery)) AND yearPublished&gt;2019</code>. Brackets around the
+      whole query are removed before searching, so <code>(drone AND (package OR delivery))</code>
+      works as expected.
+    </li>
+    <li>
+      The number of results comes from CORE. For a quoted phrase in a field, such as
+      <code>title:"drone delivery"</code>, CORE reports far more matches than really contain the
+      phrase; the best matches still come first.
+    </li>
+  </ul>
+
+  <h3 id="search-help-examples">Try an example</h3>
+  <ul class="chips" aria-labelledby="search-help-examples">
+    @for (example of examples; track example) {
+      <li>
+        <button type="button" class="chip" (click)="exampleSelected.emit(example)">
+          {{ example }}
+        </button>
+      </li>
+    }
+  </ul>
+</section>

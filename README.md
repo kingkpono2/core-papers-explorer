@@ -13,7 +13,16 @@ charts how all matching papers are distributed over time.
 
 ## Features
 
-- Keyword search against CORE, including boolean queries
+- Keyword search against CORE with boolean queries: AND, OR, NOT, brackets, phrases, fields such
+  as `title:` and `authors:`, year comparisons and wildcards
+- The query is checked as you type: unbalanced brackets, dangling operators, unclosed quotes,
+  unknown fields and other mistakes are explained under the search box, with the offending part
+  marked, and a query with errors is never sent to CORE. Warnings, such as lowercase `and`, explain
+  what CORE will do without blocking the search
+- A "How to search" panel with the syntax, CORE's quirks, example queries that run with one click
+  and buttons that insert a field at the cursor
+- The last eight searches are kept as one-click chips, with a button to clear them
+- Search terms are highlighted in titles and abstracts
 - A results-per-page choice (10, 25, 50 or 100), remembered for the next visit
 - Pagination with Previous/Next and page numbers ("Showing 26–50 of 71,213"), compact on phones
 - The query, page and page size live in the URL, so searches can be bookmarked and shared and the
@@ -29,6 +38,25 @@ charts how all matching papers are distributed over time.
 
 CORE serves at most 100 results per request and only the first 10,000 results of any search, so
 pagination stops at the 10,000th result and says so.
+
+## Search syntax
+
+| Write                                         | To find                                           |
+| --------------------------------------------- | ------------------------------------------------- |
+| `drone AND delivery`                          | papers with both words                            |
+| `drone OR uav`, `drone uav`                   | papers with either word (CORE's default is OR)    |
+| `drone NOT military`, `drone -military`       | drone papers that do not mention military         |
+| `drone AND (package OR delivery)`             | brackets group parts of the query                 |
+| `"drone delivery"`                            | the exact phrase                                  |
+| `dron*`, `colo?r`                             | wildcards: any letters, or exactly one            |
+| `title:drone`, `authors:"Jane Doe"`           | a word or phrase in one field                     |
+| `yearPublished>=2019 AND yearPublished<=2021` | a range of years (CORE fails on `[2019 TO 2021]`) |
+
+Other fields include `abstract`, `fullText`, `documentType`, `fieldOfStudy`, `publisher`, `doi`
+and `language`. CORE also reads lowercase `and`, `or` and `not` as operators, and it ignores an
+OR group nested inside other brackets; the app warns about both and removes brackets around the
+whole query before sending it. The [walkthrough](docs/WALKTHROUGH.md#phase-5-boolean-search) has
+the details and the evidence.
 
 ## Tech stack
 
@@ -178,11 +206,12 @@ src/
       layout/          site header and footer
       models/          raw CORE API types, the app's Paper model and the mapper between them
     features/
-      search/          the search page (lazy loaded), URL params, paging maths, page size
-                       preference
+      search/          the search page (lazy loaded), search bar, help panel, URL params, paging
+                       maths, page size preference and recent searches
+        query/         query analyser (tokenizer, parser, diagnostics) and the CORE workarounds
     shared/
       ui/              presentational components: paper card, skeleton, empty and error states,
-                       pagination
+                       pagination, term highlighting
     app.config.ts      application providers
     app.routes.ts      routes
   environments/        build-time configuration, including the optional API key
@@ -208,6 +237,6 @@ Design decisions are explained in [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md).
 - [x] 2. CORE API layer: typed models, service, timeouts, retry with backoff on 429, error handling
 - [x] 3. Paper cards with loading, empty and error states; responsive and accessible
 - [x] 4. Results-per-page control, pagination and state in the URL
-- [ ] 5. Boolean keyword search with validation, help and search history
+- [x] 5. Boolean keyword search with validation, help and search history
 - [ ] 6. Chart of papers per year across all matching results
 - [ ] 7. Extras: response cache, CSV/BibTeX export, dark mode
