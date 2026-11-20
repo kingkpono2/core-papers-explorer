@@ -213,6 +213,8 @@ export function createHandler({
     send(res, upstream.status, redactKey(body, apiKey), {
       ...headers,
       'cache-control': cacheControlFor(upstream.status),
+      // Says whether a key was configured, never the key itself; handy when checking a deployment.
+      'x-core-auth': apiKey?.trim() ? 'key' : 'anonymous',
     });
   };
 }
