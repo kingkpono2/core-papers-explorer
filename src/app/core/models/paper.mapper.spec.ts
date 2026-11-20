@@ -1,5 +1,5 @@
 import { CoreWork } from './core-api.models';
-import { cleanText, toPaper, toSearchResult } from './paper.mapper';
+import { cleanText, toPaper, toSearchResult, toYearCounts } from './paper.mapper';
 
 describe('paper mapper', () => {
   const work = (overrides: Partial<CoreWork> = {}): CoreWork => ({ id: 42, ...overrides });
@@ -157,6 +157,37 @@ describe('paper mapper', () => {
       expect(result.limit).toBe(10);
       expect(result.offset).toBe(20);
       expect(result.papers.map((paper) => paper.title)).toEqual(['A', 'B']);
+    });
+  });
+
+  describe('toYearCounts', () => {
+    it('sorts the years and drops keys and counts that are not whole numbers', () => {
+      const yearPublished = { '2021': 464, '2019': 252, '2020': 354, unknown: 3, '2018': 0 };
+
+      expect(toYearCounts({ aggregations: { yearPublished } })).toEqual({
+        counts: [
+          { year: 2019, count: 252 },
+          { year: 2020, count: 354 },
+          { year: 2021, count: 464 },
+        ],
+        truncated: false,
+      });
+    });
+
+    it('reads the empty array CORE sends when nothing matches', () => {
+      expect(toYearCounts({ aggregations: { yearPublished: [] } })).toEqual({
+        counts: [],
+        truncated: false,
+      });
+      expect(toYearCounts({})).toEqual({ counts: [], truncated: false });
+    });
+
+    it('flags an answer that hit the 100-year cap', () => {
+      const yearPublished = Object.fromEntries(
+        Array.from({ length: 100 }, (_, i) => [String(1927 + i), i + 1]),
+      );
+
+      expect(toYearCounts({ aggregations: { yearPublished } }).truncated).toBeTrue();
     });
   });
 });

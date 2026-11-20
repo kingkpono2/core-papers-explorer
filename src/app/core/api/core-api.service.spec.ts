@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { CoreSearchResponse } from '../models/core-api.models';
-import { SearchResult } from '../models/paper';
+import { SearchResult, YearCounts } from '../models/paper';
 import { ApiError } from './api-error';
 import { CORE_API_CONFIG, CoreApiConfig } from './core-api.config';
 import { CoreApiService } from './core-api.service';
@@ -154,5 +154,40 @@ describe('CoreApiService', () => {
     expect(req.cancelled).toBeTrue();
     expect(error?.kind).toBe('timeout');
     http.expectNone(isSearch);
+  });
+
+  describe('countByYear', () => {
+    const aggregateUrl = 'https://api.test/v3/search/works/aggregate';
+
+    it('posts the query and the yearPublished aggregation, and maps the counts', () => {
+      let counts: YearCounts | undefined;
+      service.countByYear('drone AND (package OR delivery)').subscribe((value) => (counts = value));
+
+      const req = http.expectOne(aggregateUrl);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({
+        q: 'drone AND (package OR delivery)',
+        aggregations: ['yearPublished'],
+      });
+      req.flush({ aggregations: { yearPublished: { '2020': 354, '2019': 252 } } });
+
+      expect(counts).toEqual({
+        counts: [
+          { year: 2019, count: 252 },
+          { year: 2020, count: 354 },
+        ],
+        truncated: false,
+      });
+    });
+
+    it('retries a rate-limited request and reports a lasting failure as an ApiError', () => {
+      service.countByYear('drone').subscribe({ error: (err: ApiError) => (error = err) });
+
+      http.expectOne(aggregateUrl).flush(null, { status: 429, statusText: 'Too Many Requests' });
+      jasmine.clock().tick(1_000);
+      http.expectOne(aggregateUrl).flush(null, { status: 400, statusText: 'Bad Request' });
+
+      expect(error?.kind).toBe('bad-query');
+    });
   });
 });
