@@ -17,18 +17,24 @@ Live demo: https://core-papers-explorer.vercel.app
 - **The chart counts all matches in one request.** It uses CORE's aggregation endpoint, which the
   brief does not mention, instead of one request per year or only the page on screen
   (see [Chart](#chart)).
+- **Compare research trends, a feature beyond the brief.** Two or three queries on one chart,
+  with plain-language insight worked out in the browser: size, peak year and growth to the last
+  full year. With real data it finds that `drone AND delivery` grew 13× from 2015 to 2025, against
+  4.5× for `autonomous AND vehicles` (see [Compare trends](#compare-trends)).
 
 ### Reviewer quick tour (60 seconds)
 
 1. Run the brief's example:
    [`(drone AND (package OR delivery))`](<https://core-papers-explorer.vercel.app/?q=(drone%20AND%20(package%20OR%20delivery))>).
    The note by the result count says what was sent to CORE and why; "Why?" explains the quirk.
-2. Click a bar in "Publication years" to search that year only (2020 gives 354 papers, the bar's
-   height), or press "Show as table".
-3. Open "How to search", or try a broken query such as
+2. [Compare research trends](https://core-papers-explorer.vercel.app/compare?q=drone%20AND%20delivery&q=autonomous%20AND%20vehicles):
+   two queries in one chart, with their growth compared in a sentence; try "Relative to each peak".
+3. Back on a search, click a bar in "Publication years" to search that year only (2020 gives 354
+   papers, the bar's height), or press "Show as table".
+4. Open "How to search", or try a broken query such as
    [`Title:drone AND (`](https://core-papers-explorer.vercel.app/?q=Title:drone%20AND%20%28): the
    mistakes are explained under the box and nothing is sent to CORE.
-4. Press "Export" above the results for CSV or BibTeX of the page, and the theme switch in the
+5. Press "Export" above the results for CSV or BibTeX of the page, and the theme switch in the
    header for dark mode.
 
 The start screen offers the same tour as one-click steps.
@@ -78,6 +84,12 @@ Chart
 - Click (or press Enter on) a bar to search that year only; tooltips, keyboard navigation and a
   table view
 
+Compare trends
+
+- A Compare page (`/compare?q=...&q=...`, from the header or "Compare with…" on a search) that
+  charts two or three queries together over the last 15 years, as counts or relative to each
+  query's peak, with a table view (see [Compare trends](#compare-trends))
+
 Speed and resilience
 
 - Pages seen in the last five minutes are kept in memory, so Back, Forward and revisiting a page
@@ -106,7 +118,7 @@ Engineering
 - A Vercel function in front of CORE that keeps the API key on the server, lets the CDN cache
   searches for five minutes and only allows the two endpoints the app uses (see
   [Deployment](#deployment))
-- 342 unit tests (Karma) and 34 tests for the serverless function (`node --test`), run with lint,
+- 404 unit tests (Karma) and 34 tests for the serverless function (`node --test`), run with lint,
   format check and a production build on every push by GitHub Actions
 - Deployed on Vercel with preview deployments for branches
 
@@ -196,6 +208,41 @@ on the axis above 10,000, year labels thinned to fit at phone width, a label on 
 tooltip on hover and keyboard focus, and bars that form a single tab stop moved with the arrow
 keys. A "Show as table" toggle gives the same numbers as a table. Bars grow in when drawn, unless
 the system asks for reduced motion.
+
+## Compare trends
+
+The Compare page answers a question a single search cannot: is one topic growing faster than
+another? Enter two or three queries; each is checked by the same validator as the search box and
+sent in the same corrected form, and the URL keeps them, so a comparison can be shared.
+
+**Data.** One aggregation request per query, two at a time, through the chart's per-query cache, so
+a query already charted on the search page costs nothing. Changing the queries cancels requests in
+flight, and a failed query only affects its own line, with its own Retry.
+
+**What is drawn.** One line per query over the same 15 years, ending with the latest year any query
+has, with the papers from earlier years counted under the chart per query. Each line has its own
+colour from a palette checked for colour-blind separation in both themes, and its own marker shape,
+so colour is never the only cue. Hovering or focusing a year shows every query for it; the years
+are one tab stop moved with the arrow keys. "Relative to each peak" draws each query as a share of
+its busiest year, so a small topic is not flattened by a large one, and "Show as table" gives one
+column per query.
+
+**Insight.** Computed in the browser from the same counts: for each query, its dated papers, its
+busiest full year and how its output changed from the first year shown to the last full year (the
+current year is still being filled in). Under 10 papers in the first year, the counts are given
+instead of a multiplier, so there is never a "∞×" or a 200× from 1 paper. The comparison sentence
+measures every query from the first year in which each had at least 10 papers. With real data, as
+of November 2026:
+
+> drone AND delivery: 4,166 dated papers, peaking in 2025; output went from 1 in 2012 to 579 in 2025.
+>
+> autonomous AND vehicles: 86,685 dated papers, peaking in 2024; output grew 6.6× from 2012 to 2025.
+>
+> Measured from 2015, when each had at least 10 papers, drone AND delivery grew faster than
+> autonomous AND vehicles (13× vs 4.5×).
+
+The examples use `AND` on purpose: CORE joins plain words with OR, so `drone delivery` would count
+every paper that mentions either word.
 
 ## Tech stack
 
@@ -354,6 +401,7 @@ src/
       routing/         tab titles that include the query
       theme/           the saved light or dark theme
     features/
+      compare/         the Compare page (lazy loaded), its URL params, loading and trend insights
       search/          the search page (lazy loaded), search bar, help panel, URL params, paging
                        maths, page size preference, recent searches, results cache, share button
         query/         query analyser (tokenizer, parser, diagnostics) and the CORE workarounds
@@ -361,7 +409,7 @@ src/
         export/        CSV and BibTeX export and the Export menu
     shared/
       ui/              presentational components: paper card, skeleton, empty and error states,
-                       pagination, term highlighting, bar chart
+                       pagination, term highlighting, bar chart, line chart
     app.config.ts      application providers
     app.routes.ts      routes
   environments/        build-time configuration, including the optional API key
