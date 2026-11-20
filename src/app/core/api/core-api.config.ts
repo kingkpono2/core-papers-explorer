@@ -2,6 +2,10 @@ import { InjectionToken } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { RetryPolicy } from './retry-transient';
 
+/** CORE answers `400` for `limit` above 100 or `offset` above 10,000 (checked November 2026). */
+export const CORE_MAX_LIMIT = 100;
+export const CORE_MAX_OFFSET = 10_000;
+
 export interface CoreApiConfig {
   baseUrl: string;
   apiKey: string;
