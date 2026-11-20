@@ -317,6 +317,25 @@ describe('createHandler', () => {
     assert.deepEqual(JSON.parse(res.body), { error: 'CORE answered 503 without JSON.' });
   });
 
+  it('passes on a JSON error that CORE labels as HTML, as JSON', async () => {
+    const message = 'Azure search failed with status code: 400. foo is not a searchable field.';
+    const { fetchImpl } = fakeFetch(
+      () =>
+        new Response(JSON.stringify({ message }), {
+          status: 500,
+          headers: { 'content-type': 'text/html; charset=UTF-8' },
+        }),
+    );
+    const handler = createHandler({ fetchImpl, getApiKey: () => undefined, log: silent });
+
+    const res = await run(handler);
+
+    assert.equal(res.statusCode, 500);
+    assert.equal(res.headers['content-type'], 'application/json; charset=utf-8');
+    assert.equal(res.headers['cache-control'], NO_CACHE);
+    assert.deepEqual(JSON.parse(res.body), { message });
+  });
+
   it('answers 504 when CORE is too slow', async () => {
     const fetchImpl = (_url, init) =>
       new Promise((_resolve, reject) => {

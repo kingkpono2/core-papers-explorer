@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TimeoutError } from 'rxjs';
-import { ApiError, toApiError } from './api-error';
+import { ApiError, isRejectedQuery, toApiError } from './api-error';
 
 describe('toApiError', () => {
   const kindFor = (status: number) => toApiError(new HttpErrorResponse({ status })).kind;
@@ -31,5 +31,26 @@ describe('toApiError', () => {
     expect(new ApiError('timeout').message).toBe(
       'CORE took too long to respond. Try again, or make the search more specific.',
     );
+  });
+});
+
+describe('isRejectedQuery', () => {
+  const rejected =
+    'Azure search failed with status code: 400. Error context: code=OperationNotAllowed';
+  const response = (status: number, error: unknown) => new HttpErrorResponse({ status, error });
+
+  it("recognises CORE's 500 for a query it cannot parse, as JSON or text", () => {
+    expect(isRejectedQuery(response(500, { message: rejected }))).toBeTrue();
+    expect(isRejectedQuery(response(500, JSON.stringify({ message: rejected })))).toBeTrue();
+    expect(toApiError(response(500, { message: rejected })).kind).toBe('bad-query');
+  });
+
+  it('leaves other server errors alone', () => {
+    expect(isRejectedQuery(response(500, { message: 'Internal error' }))).toBeFalse();
+    expect(isRejectedQuery(response(500, null))).toBeFalse();
+    expect(isRejectedQuery(response(503, { message: rejected }))).toBeFalse();
+    expect(
+      isRejectedQuery(response(500, { message: 'Azure search failed with status code: 503' })),
+    ).toBeFalse();
   });
 });

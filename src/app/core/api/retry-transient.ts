@@ -1,5 +1,6 @@
 import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { MonoTypeOperatorFunction, defer, retry, throwError, timer } from 'rxjs';
+import { isRejectedQuery } from './api-error';
 
 export interface RetryPolicy {
   maxRetries: number;
@@ -11,8 +12,9 @@ export interface RetryPolicy {
 
 /**
  * Retries rate-limited (429), server (5xx) and network (status 0) failures with exponential
- * backoff. A 429 waits at least until the server's Retry-After time. Gives up instead of waiting
- * past `maxTotalDelayMs`. Other errors, including timeouts and 4xx, are rethrown immediately.
+ * backoff, except CORE's 500 for a query it cannot parse, which would only fail again. A 429 waits
+ * at least until the server's Retry-After time. Gives up instead of waiting past
+ * `maxTotalDelayMs`. Other errors, including timeouts and 4xx, are rethrown immediately.
  */
 export function retryTransient<T>(policy: RetryPolicy): MonoTypeOperatorFunction<T> {
   return (source) =>
@@ -42,7 +44,8 @@ export function retryTransient<T>(policy: RetryPolicy): MonoTypeOperatorFunction
 export function isTransient(error: unknown): error is HttpErrorResponse {
   return (
     error instanceof HttpErrorResponse &&
-    (error.status === 0 || error.status === 429 || error.status >= 500)
+    (error.status === 0 || error.status === 429 || error.status >= 500) &&
+    !isRejectedQuery(error)
   );
 }
 
