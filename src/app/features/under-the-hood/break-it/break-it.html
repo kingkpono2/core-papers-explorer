@@ -1,0 +1,36 @@
+@let enabled = faults.enabled();
+<section aria-labelledby="break-it-heading">
+  <div class="heading">
+    <h3 id="break-it-heading">Break it</h3>
+    @if (faults.active()) {
+      <button type="button" class="link-button" (click)="faults.turnOff()">Turn all off</button>
+    }
+  </div>
+  <p class="hint">
+    Makes requests fail on purpose, in this tab only and until a reload. Faked answers never reach
+    CORE; the app meets them with its real retry and error handling.
+  </p>
+  <ul class="switches">
+    @for (fault of switches; track fault.mode) {
+      @let on = enabled.has(fault.mode);
+      <li class="switch" [class.switch--on]="on">
+        <button
+          type="button"
+          role="switch"
+          class="switch__control"
+          [id]="'fault-' + fault.mode"
+          [attr.aria-checked]="on"
+          [attr.aria-describedby]="'fault-' + fault.mode + '-description'"
+          (click)="toggle(fault.mode)"
+        >
+          <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+          <span class="switch__label">{{ fault.label }}</span>
+          <span class="switch__state" aria-hidden="true">{{ on ? 'On' : 'Off' }}</span>
+        </button>
+        <p class="switch__description" [id]="'fault-' + fault.mode + '-description'">
+          {{ fault.description }}
+        </p>
+      </li>
+    }
+  </ul>
+</section>

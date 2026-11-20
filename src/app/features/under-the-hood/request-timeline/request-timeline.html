@@ -1,0 +1,108 @@
+@let list = rows();
+<section aria-labelledby="timeline-heading">
+  <div class="heading">
+    <h3 id="timeline-heading">
+      Live requests <span class="heading__count">({{ list.length }})</span>
+    </h3>
+    @if (list.length) {
+      <button type="button" class="link-button" (click)="clear()">Clear</button>
+    }
+  </div>
+  <ul class="legend" aria-label="What the bars show">
+    @for (item of legend; track item.kind) {
+      <li>
+        <span class="swatch swatch--{{ item.kind }}" aria-hidden="true"></span>{{ item.label }}
+      </li>
+    }
+  </ul>
+  @if (noServerTiming()) {
+    <p class="hint">
+      No Server-Timing on some answers: the dev server proxies straight to CORE, so their time is
+      not split. The deployed proxy adds it, and a request id.
+    </p>
+  }
+  @if (list.length) {
+    <ol class="rows" aria-label="Requests, newest first">
+      @for (row of list; track row.entry.id) {
+        @let entry = row.entry;
+        <li class="row" [class.row--memory]="entry.source === 'memory'">
+          <div class="row__top">
+            <span class="status status--{{ row.status.tone }}">{{ row.status.label }}</span>
+            <span class="row__what">
+              <span class="row__method">{{ entry.method }}</span> {{ row.endpoint }}
+            </span>
+            @if (row.duration) {
+              <span class="row__duration">{{ row.duration }}</span>
+            }
+          </div>
+          @if (entry.query) {
+            <p class="row__query">
+              <code>{{ entry.query }}</code>
+            </p>
+          }
+          @if (entry.source === 'memory') {
+            <p class="row__note">Served from memory · 0 requests</p>
+          }
+          @if (row.bars.length) {
+            <div class="bar" aria-hidden="true">
+              <span class="bar__fill" [style.width.%]="row.barPercent">
+                @for (bar of row.bars; track bar.kind) {
+                  <span
+                    class="bar__part bar__part--{{ bar.kind }}"
+                    [style.width.%]="bar.share"
+                  ></span>
+                }
+              </span>
+            </div>
+          } @else if (entry.outcome === 'pending') {
+            <div class="bar bar--pending" aria-hidden="true"><span class="bar__fill"></span></div>
+          }
+          @if (row.split) {
+            <p class="row__split">{{ row.split }}</p>
+          }
+          <p class="row__meta">
+            <span>{{ row.meta }}</span>
+            <!-- The hidden commas keep screen readers from running the parts together. -->
+            @if (row.cdn; as cdn) {
+              <span class="tag" [class.tag--hit]="cdn.hit"
+                ><span class="visually-hidden">, </span>{{ cdn.label }}</span
+              >
+            }
+            @if (row.injected) {
+              <span class="tag tag--faked"
+                ><span class="visually-hidden">, </span>Faked: {{ row.injected }}</span
+              >
+            }
+            @if (entry.requestId; as id) {
+              <button
+                type="button"
+                class="copy"
+                [attr.aria-label]="'Copy request ID ' + id"
+                [title]="'Copy request ID ' + id"
+                (click)="copy(id)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  @if (copied() === id) {
+                    <path d="m5 12.5 4.5 4.5L19 7.5" />
+                  } @else {
+                    <rect x="8" y="8" width="12" height="12" rx="2" />
+                    <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+                  }
+                </svg>
+                <code>{{ id.slice(0, 8) }}</code>
+              </button>
+            }
+          </p>
+          @if (row.followUp) {
+            <p class="row__follow-up">{{ row.followUp }}</p>
+          }
+        </li>
+      }
+    </ol>
+  } @else {
+    <p class="empty">
+      No requests yet. Search, and each request to CORE appears here as it happens.
+    </p>
+  }
+  <span class="visually-hidden" role="status">{{ copied() ? 'Request ID copied' : '' }}</span>
+</section>

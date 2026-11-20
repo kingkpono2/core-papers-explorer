@@ -1,0 +1,49 @@
+<dialog
+  #dialog
+  class="drawer"
+  tabindex="-1"
+  aria-labelledby="hood-heading"
+  (keydown)="onKeydown($event)"
+  (cancel)="onCancel($event)"
+  (close)="onClose()"
+  (click)="onClick($event)"
+>
+  @if (hood.isOpen()) {
+    <div class="drawer__panel">
+      <header class="drawer__header">
+        <div>
+          <h2 id="hood-heading" #heading tabindex="-1">Under the hood</h2>
+          <p class="drawer__subtitle">
+            Every request to CORE, live · <kbd>Shift</kbd>+<kbd>D</kbd> to open and close
+          </p>
+        </div>
+        <button
+          type="button"
+          class="drawer__close"
+          aria-label="Close Under the hood"
+          title="Close (Esc)"
+          (click)="close()"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </header>
+
+      <div class="drawer__body">
+        <section class="seeing" aria-labelledby="hood-seeing-heading">
+          <h3 id="hood-seeing-heading">What you’re seeing</h3>
+          <p>
+            Every request this tab makes to CORE, live, its time split by the proxy’s Server-Timing.
+            Retries are numbered attempts; cache hits cost no request. Kept in this tab’s memory
+            only, the last 100.
+          </p>
+        </section>
+        <app-hood-stats class="stats" [entries]="entries()" />
+        <app-break-it class="break-it" />
+        <app-request-timeline class="timeline" [entries]="entries()" />
+      </div>
+      <p class="visually-hidden announcement" role="status">{{ announcement() }}</p>
+    </div>
+  }
+</dialog>
