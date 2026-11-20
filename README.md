@@ -37,11 +37,11 @@ Live demo: https://core-papers-explorer.vercel.app
 ### Reviewer quick tour (60 seconds)
 
 1. Run the brief's example:
-   [`(drone AND (package OR delivery))`](<https://core-papers-explorer.vercel.app/?q=(drone%20AND%20(package%20OR%20delivery))>).
+   [`(drone AND (package OR delivery))`](https://core-papers-explorer.vercel.app/?q=%28drone%20AND%20%28package%20OR%20delivery%29%29).
    The note by the result count says what was sent to CORE and why; "Why?" explains the quirk.
 2. [Compare research trends](https://core-papers-explorer.vercel.app/compare?q=drone%20AND%20delivery&q=autonomous%20AND%20vehicles):
    two queries in one chart, with their growth compared in a sentence; try "Relative to each peak".
-3. [Open the Galaxy and press Play](<https://core-papers-explorer.vercel.app/galaxy?q=(drone%20AND%20(package%20OR%20delivery))>):
+3. [Open the Galaxy and press Play](https://core-papers-explorer.vercel.app/galaxy?q=%28drone%20AND%20%28package%20OR%20delivery%29%29):
    the brief's example as three topics; watch them form year by year, hover a star, then choose
    "last mile · logistics" in the legend and "Search this topic".
 4. Break it: open Under the hood (Shift+D) and switch on "Rate limited", then close it and search.
