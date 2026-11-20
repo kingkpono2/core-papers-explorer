@@ -69,9 +69,14 @@
           @for (point of line.points; track point.index) {
             <use
               [attr.href]="'#line-chart-marker-' + line.slot"
-              [attr.x]="point.x"
-              [attr.y]="point.y"
-              [class.is-active]="activeIndex === point.index"
+              [attr.transform]="
+                'translate(' +
+                point.x +
+                ',' +
+                point.y +
+                ')' +
+                (activeIndex === point.index ? ' scale(1.4)' : '')
+              "
             />
           }
         }
@@ -99,7 +104,13 @@
   }
 
   @if (tooltip(); as tip) {
-    <div class="tooltip" aria-hidden="true" [style.left.px]="tip.x" [style.top.px]="tip.y">
+    <div
+      class="tooltip"
+      [class.tooltip--left]="tip.flip"
+      aria-hidden="true"
+      [style.left.px]="tip.x"
+      [style.top.px]="tip.y"
+    >
       <p class="tooltip__heading">{{ tip.heading }}</p>
       @for (row of tip.rows; track row.key) {
         <p class="tooltip__row">

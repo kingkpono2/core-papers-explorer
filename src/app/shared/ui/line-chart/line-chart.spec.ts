@@ -149,6 +149,48 @@ describe('LineChart', () => {
     expect(labels.at(-1)).toBe('2026');
   });
 
+  it('shows given labels instead of the values, and a suffix on the axis', async () => {
+    fixture.componentRef.setInput('axisSuffix', '%');
+    await render(years(2020, 2), [
+      { key: 'a', label: 'a', values: [50, 100], labels: ['3 papers', '6 papers'], slot: 1 },
+    ]);
+
+    expect(hits().map((hit) => hit.getAttribute('aria-label'))).toEqual([
+      '2020: a 3 papers',
+      '2021: a 6 papers',
+    ]);
+    expect([...el.querySelectorAll('.tick')].map((tick) => tick.textContent?.trim())).toEqual([
+      '0%',
+      '50%',
+      '100%',
+    ]);
+  });
+
+  it('places the tooltip beside the crosshair, on the side with room', async () => {
+    await render(
+      years(2020, 4),
+      two.map((s) => ({ ...s, values: [1, 2, 3, 4] })),
+    );
+
+    hits()[0].dispatchEvent(new MouseEvent('mouseenter'));
+    await fixture.whenStable();
+    expect(el.querySelector('.tooltip')?.classList).not.toContain('tooltip--left');
+
+    hits()[3].dispatchEvent(new MouseEvent('mouseenter'));
+    await fixture.whenStable();
+    expect(el.querySelector('.tooltip')?.classList).toContain('tooltip--left');
+  });
+
+  it('enlarges the markers of the active year in place', async () => {
+    await render(years(2020, 2), [two[0]]);
+
+    hits()[1].dispatchEvent(new MouseEvent('mouseenter'));
+    await fixture.whenStable();
+    const markers = [...el.querySelectorAll('g use')].map((use) => use.getAttribute('transform'));
+    expect(markers[0]).toMatch(/^translate\([\d.]+,[\d.]+\)$/);
+    expect(markers[1]).toMatch(/^translate\([\d.]+,[\d.]+\) scale\(1\.4\)$/);
+  });
+
   it('says when a series has no value for a year', async () => {
     await render(years(2020, 2), [{ key: 'a', label: 'a', values: [null, 3], slot: 1 }]);
 

@@ -26,6 +26,8 @@ export interface LineSeries {
   label: string;
   /** One value per category; null leaves a gap. */
   values: readonly (number | null)[];
+  /** How to show each value in the tooltip and read it out, if not as the number and `unit`. */
+  labels?: readonly string[];
   /**
    * The colour and marker, from 1 to 3. It belongs to the series, not its position, so a series
    * keeps its colour when another one drops out.
@@ -40,7 +42,8 @@ const MARGIN = { top: 16, right: 12, bottom: 26 };
 /** Room for a four-digit year at the axis font size. */
 const LABEL_WIDTH = 40;
 const DIGIT_WIDTH = 7.5;
-const TOOLTIP_WIDTH = 200;
+/** Space between the crosshair and the tooltip beside it. */
+const TOOLTIP_OFFSET = 12;
 
 /**
  * A responsive line chart for up to three series over shared categories, drawn as SVG at the width
@@ -61,6 +64,8 @@ export class LineChart {
   readonly label = input.required<string>();
   /** Added to each value where it is read out or shown in the tooltip, such as "papers". */
   readonly unit = input('');
+  /** Added to the axis labels, such as "%". */
+  readonly axisSuffix = input('');
 
   protected readonly height = HEIGHT;
   protected readonly width = signal(0);
@@ -89,7 +94,7 @@ export class LineChart {
     const ticks = niceTicks(max);
     const top = ticks[ticks.length - 1];
     const format = top >= 10_000 ? this.compact : this.full;
-    const tickLabels = ticks.map((tick) => format.format(tick));
+    const tickLabels = ticks.map((tick) => format.format(tick) + this.axisSuffix());
     const left = Math.ceil(Math.max(...tickLabels.map((text) => text.length)) * DIGIT_WIDTH) + 10;
     const plotWidth = width - left - MARGIN.right;
     const plotHeight = HEIGHT - MARGIN.top - MARGIN.bottom;
@@ -134,17 +139,18 @@ export class LineChart {
     if (!column || index === null) {
       return null;
     }
-    const halfWidth = Math.min(TOOLTIP_WIDTH / 2, layout.width / 2);
+    const flip = column.center > layout.width / 2;
     return {
       heading: column.category.description,
       rows: this.series().map((series) => ({
         key: series.key,
         slot: slotOf(series),
         label: series.label,
-        value: this.format(series.values[index] ?? null),
+        value: this.valueText(series, index),
       })),
-      x: clamp(column.center, halfWidth, layout.width - halfWidth),
+      x: column.center + (flip ? -TOOLTIP_OFFSET : TOOLTIP_OFFSET),
       y: layout.top,
+      flip,
     };
   });
 
@@ -186,9 +192,13 @@ export class LineChart {
   private describe(index: number): string {
     const category = this.categories()[index];
     const values = this.series().map(
-      (series) => `${series.label} ${this.format(series.values[index] ?? null)}`,
+      (series) => `${series.label} ${this.valueText(series, index)}`,
     );
     return `${category.description}: ${values.join(', ')}`;
+  }
+
+  private valueText(series: LineSeries, index: number): string {
+    return series.labels?.[index] ?? this.format(series.values[index] ?? null);
   }
 
   private format(value: number | null): string {

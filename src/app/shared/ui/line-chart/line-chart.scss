@@ -104,12 +104,6 @@
   paint-order: stroke;
 }
 
-use.is-active {
-  transform-box: fill-box;
-  transform-origin: center;
-  transform: scale(1.35);
-}
-
 .hit {
   fill: transparent;
 
@@ -127,7 +121,7 @@ use.is-active {
   position: absolute;
   z-index: 1;
   width: max-content;
-  max-width: 200px;
+  max-width: min(15rem, 70vw);
   padding: var(--space-2) var(--space-3);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
@@ -136,8 +130,12 @@ use.is-active {
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
-  transform: translate(-50%, -100%);
   pointer-events: none;
+
+  // On the right half of the chart the tooltip sits to the left of the crosshair.
+  &--left {
+    transform: translateX(-100%);
+  }
 
   p {
     margin: 0;
@@ -151,7 +149,7 @@ use.is-active {
 .tooltip__row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2);
 }
 
@@ -162,9 +160,7 @@ use.is-active {
 }
 
 .tooltip__label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .tooltip__value {
