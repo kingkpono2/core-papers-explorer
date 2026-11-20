@@ -14,7 +14,7 @@ import {
 } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Observable, Subject, catchError, map, merge, of, startWith, switchMap } from 'rxjs';
+import { Observable, Subject, catchError, map, merge, of, startWith, switchMap, tap } from 'rxjs';
 import { ApiError, toApiError } from '../../../core/api/api-error';
 import { CoreApiService } from '../../../core/api/core-api.service';
 import { SearchResult } from '../../../core/models/paper';
@@ -30,6 +30,7 @@ import { toCoreQuery } from '../query/core-query';
 import { analyseQuery, positiveTerms } from '../query/query-analyser';
 import { RecentSearches } from '../recent-searches';
 import { SearchBar } from '../search-bar/search-bar';
+import { SearchResultsCache } from '../search-results-cache';
 import {
   DEFAULT_PAGE_SIZE,
   PAGE_SIZES,
@@ -72,6 +73,7 @@ export class SearchPage {
   private readonly route = inject(ActivatedRoute);
   private readonly pageSizePreference = inject(PageSizePreference);
   private readonly recentSearches = inject(RecentSearches);
+  private readonly cache = inject(SearchResultsCache);
   private readonly numbers = new Intl.NumberFormat(inject(LOCALE_ID));
   private readonly reloads = new Subject<void>();
   private readonly queryParamMap = toSignal(this.route.queryParamMap, { requireSync: true });
@@ -97,15 +99,19 @@ export class SearchPage {
 
   // switchMap unsubscribes from the previous search, which aborts its HTTP request. A query with
   // errors (from a hand-edited or old link) is never sent; the search bar explains what is wrong.
+  // Navigation may be answered from the cache; a reload always asks CORE.
   protected readonly state = toSignal<SearchState, SearchState>(
-    merge(toObservable(this.params), this.reloads.pipe(map(() => this.params()))).pipe(
-      switchMap((params) => {
+    merge(
+      toObservable(this.params).pipe(map((params) => ({ params, fresh: false }))),
+      this.reloads.pipe(map(() => ({ params: this.params(), fresh: true }))),
+    ).pipe(
+      switchMap(({ params, fresh }) => {
         if (!params.query) {
           return of<SearchState>({ status: 'idle' });
         }
         return analyseQuery(params.query).hasErrors
           ? of<SearchState>({ status: 'invalid', params })
-          : this.load(params);
+          : this.load(params, fresh);
       }),
     ),
     { initialValue: { status: 'idle' } },
@@ -236,10 +242,15 @@ export class SearchPage {
     void this.router.navigate([], { relativeTo: this.route, queryParams: toQueryParams(params) });
   }
 
-  private load(params: SearchParams): Observable<SearchState> {
+  private load(params: SearchParams, fresh: boolean): Observable<SearchState> {
     const { query, page, size } = params;
     const request = { query: toCoreQuery(query), limit: size, offset: pageOffset(page, size) };
+    const cached = fresh ? undefined : this.cache.get(request);
+    if (cached) {
+      return of<SearchState>({ status: 'success', params, result: cached });
+    }
     return this.api.searchWorks(request).pipe(
+      tap((result) => this.cache.set(request, result)),
       map((result): SearchState => ({ status: 'success', params, result })),
       catchError((error: unknown) =>
         of<SearchState>({ status: 'error', params, error: toApiError(error) }),

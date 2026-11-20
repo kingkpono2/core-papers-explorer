@@ -330,10 +330,10 @@ describe('SearchPage', () => {
       expect(lastRequest()).toEqual({ query: 'robots', limit: 25, offset: 0 });
     });
 
-    it('restores the previous search on Back', async () => {
+    it('restores the previous search on Back from the cache, without a request', async () => {
       await open();
       await submit('first');
-      await respond(resultOf(1, papers(1)));
+      await respond(resultOf(1, [makePaper({ title: 'First paper' })]));
       await submit('second');
       await respond(resultOf(1, papers(1)));
 
@@ -341,6 +341,20 @@ describe('SearchPage', () => {
 
       expect(url()).toBe('/?q=first&size=10');
       expect(input().value).toBe('first');
+      expect(searchWorks).toHaveBeenCalledTimes(2);
+      expect(results().textContent).toContain('First paper');
+      expect(summary()).toBe('Showing 1 of 1 paper for “first”');
+    });
+
+    it('asks CORE again on Back when the earlier search failed', async () => {
+      await open();
+      await submit('first');
+      await fail(new ApiError('server'));
+      await submit('second');
+      await respond(resultOf(1, papers(1)));
+
+      await back();
+
       expect(searchWorks).toHaveBeenCalledTimes(3);
       expect(lastRequest()).toEqual({ query: 'first', limit: 10, offset: 0 });
     });
@@ -406,8 +420,8 @@ describe('SearchPage', () => {
       await back();
 
       expect(url()).toBe('/?q=drone&size=25');
-      expect(lastRequest()).toEqual({ query: 'drone', limit: 25, offset: 0 });
-      expect(searchWorks).toHaveBeenCalledTimes(3);
+      expect(summary()).toBe('Showing 1–25 of 71,213 papers for “drone”');
+      expect(searchWorks).toHaveBeenCalledTimes(2);
     });
 
     it('stops at the 10,000th result and says why', async () => {
