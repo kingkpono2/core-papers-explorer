@@ -40,5 +40,14 @@
         Syntax, CORE’s quirks and the mistakes caught before a query is sent.
       </span>
     </li>
+    <li>
+      <button #breakItButton type="button" class="tour__action" (click)="breakIt(breakItButton)">
+        Break it
+      </button>
+      <span class="tour__detail">
+        Open Under the hood (<kbd>Shift</kbd>+<kbd>D</kbd>) and switch on “Rate limited”, then
+        search: the app waits as CORE asks and recovers, and every attempt is shown.
+      </span>
+    </li>
   </ol>
 </section>
