@@ -190,9 +190,10 @@ describe('createHandler', () => {
     const { calls, fetchImpl } = fakeFetch(() => json(200, { results: [] }));
     const handler = createHandler({ fetchImpl, getApiKey: () => undefined, log: silent });
 
-    await run(handler);
+    const res = await run(handler);
 
     assert.equal('Authorization' in calls[0].init.headers, false);
+    assert.equal(res.headers['x-core-auth'], 'anonymous');
   });
 
   it('sends the key upstream but never back to the browser', async () => {
@@ -224,6 +225,7 @@ describe('createHandler', () => {
     assert.equal(res.headers['content-type'], 'application/json');
     assert.equal(res.headers['x-ratelimit-remaining'], '9');
     assert.equal(res.headers['set-cookie'], undefined);
+    assert.equal(res.headers['x-core-auth'], 'key');
   });
 
   it('passes a 429 through uncached with its retry headers', async () => {
