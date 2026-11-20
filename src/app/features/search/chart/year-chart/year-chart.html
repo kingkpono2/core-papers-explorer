@@ -18,6 +18,13 @@
     }
   </header>
 
+  @if (current.status === 'loading' || current.status === 'success') {
+    <p class="caption">
+      All {{ current.total ? current.total + ' ' : '' }}matching papers by year of publication, not
+      only those on this page. Counts come from CORE.
+    </p>
+  }
+
   @switch (current.status) {
     @case ('blank') {
       <div class="frame" aria-hidden="true"></div>
@@ -25,11 +32,13 @@
     }
     @case ('loading') {
       <p class="visually-hidden">Counting papers per year…</p>
-      <div class="skeleton" aria-hidden="true">
+      <!-- The same height as the chart and its usual notes, so the results below do not move. -->
+      <div class="skeleton skeleton--loading" aria-hidden="true">
         @for (height of skeleton; track $index) {
           <span class="skeleton__bar" [style.height.%]="height"></span>
         }
       </div>
+      <div class="notes-placeholder" aria-hidden="true"></div>
     }
     @case ('empty') {
       <div class="frame" aria-hidden="true"></div>
@@ -44,11 +53,6 @@
       </div>
     }
     @case ('success') {
-      <p class="caption">
-        All {{ current.total ? current.total + ' ' : '' }}matching papers by year of publication,
-        not only those on this page. Counts come from CORE.
-      </p>
-
       @if (showTable()) {
         <div class="table-wrap">
           <table class="table">

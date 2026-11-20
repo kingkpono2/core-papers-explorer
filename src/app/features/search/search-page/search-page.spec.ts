@@ -190,12 +190,16 @@ describe('SearchPage', () => {
       expect(marks).toEqual(['drone', 'Drones']);
     });
 
-    it('remembers successful searches', async () => {
+    it('remembers successful searches and lists them from the next search on', async () => {
       await submit('robots');
       expect(recentQueries()).toEqual([]);
 
       await respond(resultOf(1, papers(1)));
       expect(recentQueries()).toEqual(['robots']);
+      // Not straight away, which would push the results down as they appear.
+      expect(el.querySelector('.recent')).toBeNull();
+
+      await submit('drones');
       expect(el.querySelector('.recent')?.textContent).toContain('robots');
     });
 
@@ -240,11 +244,12 @@ describe('SearchPage', () => {
       expect(el.querySelector('app-export-menu')).toBeNull();
     });
 
-    it('offers to export the papers on the page', async () => {
+    it('offers to share the search and export the papers on the page', async () => {
       await submit('drone');
-      expect(el.querySelector('app-export-menu')).toBeNull();
+      expect(el.querySelector('.results__actions')).toBeNull();
 
       await respond(resultOf(30, papers(10)));
+      expect(el.querySelector('app-share-link button')).not.toBeNull();
       expect(el.querySelector('app-export-menu')?.textContent).toContain('This page (10 papers)');
     });
 

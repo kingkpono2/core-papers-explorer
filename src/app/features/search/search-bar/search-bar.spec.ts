@@ -146,6 +146,36 @@ describe('SearchBar', () => {
     expect(input().value).toBe('drones');
   });
 
+  describe('keyboard shortcut', () => {
+    beforeEach(() => create('drone'));
+
+    it('focuses and selects the search box on /', async () => {
+      const event = await press(document.body, '/');
+
+      expect(event.defaultPrevented).toBeTrue();
+      expect(document.activeElement).toBe(input());
+      expect([input().selectionStart, input().selectionEnd]).toEqual([0, 5]);
+      expect(input().getAttribute('aria-keyshortcuts')).toBe('/');
+    });
+
+    it('leaves / alone while typing or with a modifier key', async () => {
+      const other = document.body.appendChild(document.createElement('textarea'));
+      other.focus();
+
+      expect((await press(other, '/')).defaultPrevented).toBeFalse();
+      expect(document.activeElement).toBe(other);
+      other.remove();
+
+      input().focus();
+      expect((await press(input(), '/')).defaultPrevented).toBeFalse();
+
+      input().blur();
+      const withCtrl = new KeyboardEvent('keydown', { key: '/', ctrlKey: true, bubbles: true });
+      document.body.dispatchEvent(withCtrl);
+      expect(document.activeElement).not.toBe(input());
+    });
+  });
+
   describe('help', () => {
     beforeEach(() => create());
 

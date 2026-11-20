@@ -60,6 +60,9 @@ describe('citationKey', () => {
     expect(citationKey(makePaper({ authors: ['Müller, Anna'], year: 2019 }))).toBe('muller2019');
     expect(citationKey(makePaper({ authors: ['Anna van der Berg'], year: 2019 }))).toBe('berg2019');
     expect(citationKey(makePaper({ authors: ["O'Brien, Pat"], year: null }))).toBe('obriennd');
+    expect(citationKey(makePaper({ authors: ['Xiao Liu (13082469)'], year: 2025 }))).toBe(
+      'liu2025',
+    );
     expect(citationKey(makePaper({ authors: ['王伟'], year: 2021 }))).toBe('anon2021');
   });
 });

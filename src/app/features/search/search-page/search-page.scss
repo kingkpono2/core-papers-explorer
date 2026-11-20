@@ -81,8 +81,10 @@ select {
   margin-bottom: var(--space-4);
 }
 
+// Tall enough for the share and export buttons, so the summary stays put when they appear.
 .results__title {
   display: flex;
+  min-height: 2.5rem;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;

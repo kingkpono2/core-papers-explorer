@@ -47,8 +47,8 @@ function bibtexEntry(paper: Paper, key: string): string {
 
 /** The first author's family name and the year, in plain lowercase letters: `muller2020`. */
 export function citationKey({ authors, year }: Paper): string {
-  const name = authors[0]?.trim() ?? '';
-  // CORE gives names as "Family, Given" or "Given Family".
+  // CORE gives names as "Family, Given" or "Given Family", sometimes followed by an ID in brackets.
+  const name = authors[0]?.replace(/\([^)]*\)/g, '').trim() ?? '';
   const family = name.includes(',') ? name.split(',')[0] : (name.split(/\s+/).at(-1) ?? '');
   const ascii = family
     .normalize('NFD')

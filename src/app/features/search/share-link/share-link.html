@@ -1,0 +1,28 @@
+<button type="button" class="button button--secondary button--small" (click)="share()">
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    @if (status() === 'copied') {
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    } @else {
+      <path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6" />
+      <path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2" />
+    }
+  </svg>
+  @switch (status()) {
+    @case ('copied') {
+      Link copied
+    }
+    @case ('failed') {
+      Could not copy
+    }
+    @default {
+      {{ canShare ? 'Share' : 'Copy link' }}
+    }
+  }
+</button>
+<span class="visually-hidden" role="status">{{
+  status() === 'copied'
+    ? 'Link to this search copied'
+    : status() === 'failed'
+      ? 'Could not copy the link. Copy it from the address bar.'
+      : ''
+}}</span>

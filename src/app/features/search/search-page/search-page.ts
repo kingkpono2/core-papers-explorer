@@ -32,6 +32,7 @@ import { analyseQuery, positiveTerms } from '../query/query-analyser';
 import { RecentSearches } from '../recent-searches';
 import { SearchBar } from '../search-bar/search-bar';
 import { SearchResultsCache } from '../search-results-cache';
+import { ShareLink } from '../share-link/share-link';
 import {
   DEFAULT_PAGE_SIZE,
   PAGE_SIZES,
@@ -62,6 +63,7 @@ const SKELETON_COUNT = 3;
     PaperCard,
     RouterLink,
     SearchBar,
+    ShareLink,
     SkeletonCard,
     YearChart,
   ],

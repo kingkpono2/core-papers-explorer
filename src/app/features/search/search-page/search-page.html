@@ -26,6 +26,7 @@
         <h2 id="results-heading" #resultsHeading tabindex="-1">Results</h2>
         @if (current.status === 'success' && current.result.papers.length) {
           <div class="results__actions">
+            <app-share-link />
             <app-export-menu
               [papers]="current.result.papers"
               [query]="current.params.query"
