@@ -2,7 +2,9 @@
 <article class="card" [attr.aria-labelledby]="titleId">
   <h3 class="title" [id]="titleId">
     <a [href]="p.sourceUrl" target="_blank" rel="noopener noreferrer"
-      >{{ p.title }}<span class="visually-hidden"> (opens in a new tab)</span></a
+      ><app-highlight [text]="p.title" [terms]="highlight()" /><span class="visually-hidden">
+        (opens in a new tab)</span
+      ></a
     >
   </h3>
 
@@ -42,7 +44,7 @@
       [id]="abstractId"
       [class.abstract--clamped]="abstractIsLong() && !abstractExpanded()"
     >
-      {{ abstract }}
+      <app-highlight [text]="abstract" [terms]="highlight()" />
     </p>
     @if (abstractIsLong()) {
       <button
