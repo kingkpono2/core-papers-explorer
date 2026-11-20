@@ -23,7 +23,7 @@ export interface YearSeriesOptions {
 }
 
 /** Years outside this range are data errors in CORE, such as 1000, 2096 or 9999. */
-const FIRST_PLAUSIBLE_YEAR = 1500;
+export const FIRST_PLAUSIBLE_YEAR = 1500;
 
 const DEFAULTS: YearSeriesOptions = { minYears: 10, maxYears: 30, coverage: 0.98 };
 
