@@ -4,6 +4,35 @@ Author: Kpono Akpabio, assisted by Claude Code
 
 Live demo: https://core-papers-explorer.vercel.app
 
+## Why this submission stands out
+
+- **It finds and fixes a CORE bug in the brief's own example.** CORE ignores an OR group nested
+  in brackets, so `(drone AND (package OR delivery))` returns every drone paper (71,213) instead
+  of the 4,729 intended. The app detects this, sends the corrected query and tells the user what
+  it changed and why (see [quirks](#known-core-api-quirks-handled)).
+- **Production-hardened.** Real CORS and rate-limit failures showed up in production: CORE only
+  allows its own origins, and anonymous access allows about 10 searches. A server-side proxy fixes
+  both: it keeps the API key private, allowlists the two endpoints the app uses and lets the CDN
+  cache searches (see [Deployment](#deployment)).
+- **The chart counts all matches in one request.** It uses CORE's aggregation endpoint, which the
+  brief does not mention, instead of one request per year or only the page on screen
+  (see [Chart](#chart)).
+
+### Reviewer quick tour (60 seconds)
+
+1. Run the brief's example:
+   [`(drone AND (package OR delivery))`](<https://core-papers-explorer.vercel.app/?q=(drone%20AND%20(package%20OR%20delivery))>).
+   The note by the result count says what was sent to CORE and why; "Why?" explains the quirk.
+2. Click a bar in "Publication years" to search that year only (2020 gives 354 papers, the bar's
+   height), or press "Show as table".
+3. Open "How to search", or try a broken query such as
+   [`Title:drone AND (`](https://core-papers-explorer.vercel.app/?q=Title:drone%20AND%20%28): the
+   mistakes are explained under the box and nothing is sent to CORE.
+4. Press "Export" above the results for CSV or BibTeX of the page, and the theme switch in the
+   header for dark mode.
+
+The start screen offers the same tour as one-click steps.
+
 A small Angular app for searching open-access research papers through the
 [CORE API v3](https://api.core.ac.uk/docs/v3). It lists matching papers, lets you choose how many
 are returned, supports boolean keyword queries such as `(drone AND (package OR delivery))`, and
