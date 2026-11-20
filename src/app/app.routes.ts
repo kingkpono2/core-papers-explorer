@@ -8,5 +8,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/search/search-page/search-page').then((m) => m.SearchPage),
   },
+  {
+    path: 'compare',
+    title: `Compare trends — ${APP_TITLE}`,
+    loadComponent: () =>
+      import('./features/compare/compare-page/compare-page').then((m) => m.ComparePage),
+  },
   { path: '**', redirectTo: '' },
 ];

@@ -12,6 +12,10 @@
   </app-search-bar>
 </section>
 
+@if (showTour()) {
+  <app-reviewer-tour class="tour" (helpRequested)="openHelp()" (dismissed)="dismissTour()" />
+}
+
 @let current = state();
 <div class="layout">
   <app-year-chart class="chart" [search]="chartSearch()" (narrowed)="searchFor($event)" />
@@ -26,6 +30,12 @@
         <h2 id="results-heading" #resultsHeading tabindex="-1">Results</h2>
         @if (current.status === 'success' && current.result.papers.length) {
           <div class="results__actions">
+            <a
+              class="button button--secondary button--small"
+              routerLink="/compare"
+              [queryParams]="{ q: current.params.query }"
+              >Compare with…</a
+            >
             <app-share-link />
             <app-export-menu
               [papers]="current.result.papers"

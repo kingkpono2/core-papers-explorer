@@ -147,6 +147,11 @@ export class SearchBar {
     );
   }
 
+  /** Moves focus to the search box. */
+  focus(): void {
+    this.input().nativeElement.focus();
+  }
+
   protected closeHelp(): void {
     this.helpOpen.set(false);
     this.helpToggle().nativeElement.focus();

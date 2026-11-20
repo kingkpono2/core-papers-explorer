@@ -11,7 +11,12 @@ export class AppTitleStrategy extends TitleStrategy {
 
   override updateTitle(snapshot: RouterStateSnapshot): void {
     const base = this.buildTitle(snapshot) ?? APP_TITLE;
-    const query = snapshot.root.queryParamMap.get('q')?.trim();
+    // The compare page has several queries: "drone vs robots — Compare trends — ...".
+    const query = snapshot.root.queryParamMap
+      .getAll('q')
+      .map((q) => q.trim())
+      .filter(Boolean)
+      .join(' vs ');
     this.title.setTitle(query ? `${query} — ${base}` : base);
   }
 }

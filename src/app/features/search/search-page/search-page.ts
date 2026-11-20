@@ -30,6 +30,8 @@ import { MAX_RESULTS, lastPage, pageOffset, resultRange } from '../paging';
 import { CoreQueryChange, coreQueryAdjustment, toCoreQuery } from '../query/core-query';
 import { analyseQuery, positiveTerms } from '../query/query-analyser';
 import { RecentSearches } from '../recent-searches';
+import { ReviewerTour } from '../reviewer-tour/reviewer-tour';
+import { ReviewerTourPreference } from '../reviewer-tour/reviewer-tour-preference';
 import { SearchBar } from '../search-bar/search-bar';
 import { SearchResultsCache } from '../search-results-cache';
 import { ShareLink } from '../share-link/share-link';
@@ -61,6 +63,7 @@ const SKELETON_COUNT = 3;
     ExportMenu,
     Pagination,
     PaperCard,
+    ReviewerTour,
     RouterLink,
     SearchBar,
     ShareLink,
@@ -78,6 +81,7 @@ export class SearchPage {
   private readonly pageSizePreference = inject(PageSizePreference);
   private readonly recentSearches = inject(RecentSearches);
   private readonly cache = inject(SearchResultsCache);
+  private readonly tour = inject(ReviewerTourPreference);
   private readonly numbers = new Intl.NumberFormat(inject(LOCALE_ID));
   private readonly reloads = new Subject<void>();
   private readonly queryParamMap = toSignal(this.route.queryParamMap, { requireSync: true });
@@ -147,6 +151,11 @@ export class SearchPage {
       a === b ||
       (!!a && !!b && a.query === b.query && a.total === b.total && a.settled === b.settled),
   });
+
+  /** The reviewer quick tour belongs to the start screen only, until it is dismissed. */
+  protected readonly showTour = computed(
+    () => this.state().status === 'idle' && !this.tour.dismissed(),
+  );
 
   /** Words from the query that was searched, to mark in titles and abstracts. */
   protected readonly highlightTerms = computed(() => {
@@ -252,6 +261,16 @@ export class SearchPage {
   /** Opens How to search at the note on the CORE quirk behind a change to the query. */
   protected explain(change: CoreQueryChange): void {
     this.searchBar().showHelp(change === 'phrase' ? 'search-help-phrase' : 'search-help-nested-or');
+  }
+
+  protected openHelp(): void {
+    this.searchBar().showHelp('search-help-heading');
+  }
+
+  /** Focus goes back to the search box, so it is not lost with the card. */
+  protected dismissTour(): void {
+    this.tour.dismiss();
+    this.searchBar().focus();
   }
 
   protected reload(): void {

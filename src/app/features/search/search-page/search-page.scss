@@ -45,6 +45,10 @@ select {
   }
 }
 
+.tour {
+  margin-top: var(--space-6);
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

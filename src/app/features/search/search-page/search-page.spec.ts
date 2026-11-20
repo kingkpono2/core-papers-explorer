@@ -11,6 +11,7 @@ import { Paper, SearchResult, YearCounts } from '../../../core/models/paper';
 import { makePaper } from '../../../../testing/paper.fixture';
 import { PAGE_SIZE_STORAGE_KEY } from '../page-size-preference';
 import { RECENT_SEARCHES_STORAGE_KEY, RecentSearches } from '../recent-searches';
+import { REVIEWER_TOUR_STORAGE_KEY } from '../reviewer-tour/reviewer-tour-preference';
 import { SearchPage } from './search-page';
 
 const papers = (count: number, offset = 0): Paper[] =>
@@ -90,6 +91,7 @@ describe('SearchPage', () => {
   beforeEach(() => {
     localStorage.removeItem(PAGE_SIZE_STORAGE_KEY);
     localStorage.removeItem(RECENT_SEARCHES_STORAGE_KEY);
+    localStorage.removeItem(REVIEWER_TOUR_STORAGE_KEY);
     responses = [];
     searchWorks = jasmine.createSpy('searchWorks').and.callFake(() => {
       const response = new Subject<SearchResult>();
@@ -116,6 +118,7 @@ describe('SearchPage', () => {
   afterEach(() => {
     localStorage.removeItem(PAGE_SIZE_STORAGE_KEY);
     localStorage.removeItem(RECENT_SEARCHES_STORAGE_KEY);
+    localStorage.removeItem(REVIEWER_TOUR_STORAGE_KEY);
   });
 
   describe('search form', () => {
@@ -242,6 +245,16 @@ describe('SearchPage', () => {
       expect(el.querySelector('app-empty-state')?.textContent).toContain('Nothing matched “qwxzv”');
       expect(el.querySelector('ol')).toBeNull();
       expect(el.querySelector('app-export-menu')).toBeNull();
+    });
+
+    it('offers to compare the search with others', async () => {
+      await submit('drone AND delivery');
+      await respond(resultOf(30, papers(10)));
+
+      const compare = [...el.querySelectorAll<HTMLAnchorElement>('.results__actions a')].find(
+        (a) => a.textContent?.trim() === 'Compare with…',
+      );
+      expect(compare?.getAttribute('href')).toBe('/compare?q=drone%20AND%20delivery');
     });
 
     it('offers to share the search and export the papers on the page', async () => {
@@ -538,6 +551,94 @@ describe('SearchPage', () => {
 
       expect(url()).toBe('/?q=drone&size=10&page=3');
       expect(lastRequest()).toEqual({ query: 'drone', limit: 10, offset: 20 });
+    });
+  });
+
+  describe('reviewer quick tour', () => {
+    const tour = () => el.querySelector<HTMLElement>('app-reviewer-tour section');
+    const step = (name: string) =>
+      [...el.querySelectorAll<HTMLElement>('.tour__action')].find(
+        (action) => action.textContent?.trim() === name,
+      )!;
+    const dismiss = () =>
+      el.querySelector<HTMLButtonElement>('button[aria-label="Dismiss the reviewer quick tour"]')!;
+
+    it('is shown on the start screen as a headed list of steps', async () => {
+      await open();
+
+      expect(tour()?.getAttribute('aria-labelledby')).toBe('reviewer-tour-heading');
+      expect(el.querySelector('#reviewer-tour-heading')?.textContent).toBe('Reviewer quick tour');
+      const steps = [...el.querySelectorAll('app-reviewer-tour ol > li .tour__action')];
+      expect(steps.map((s) => s.textContent?.trim())).toEqual([
+        'Run the brief’s example',
+        'Compare research trends',
+        'See how queries are checked',
+      ]);
+      expect(step('Compare research trends').getAttribute('href')).toBe(
+        '/compare?q=drone%20AND%20delivery&q=autonomous%20AND%20vehicles',
+      );
+    });
+
+    it('runs the brief’s example, which explains the bracket fix, and is then hidden', async () => {
+      await open();
+
+      step('Run the brief’s example').click();
+      await stable();
+
+      expect(url()).toBe('/?q=(drone%20AND%20(package%20OR%20delivery))&size=10');
+      expect(searchWorks).toHaveBeenCalledOnceWith({
+        query: 'drone AND (package OR delivery)',
+        limit: 10,
+        offset: 0,
+      });
+      expect(tour()).toBeNull();
+      expect(el.querySelector('.adjusted')?.textContent).toContain(
+        'CORE ignores an OR group nested inside other brackets',
+      );
+    });
+
+    it('opens How to search at its heading', async () => {
+      await open();
+
+      step('See how queries are checked').click();
+      await stable();
+
+      expect(el.querySelector<HTMLElement>('#search-help')!.hidden).toBeFalse();
+      expect(document.activeElement?.id).toBe('search-help-heading');
+    });
+
+    it('is not shown when a link opens a search', async () => {
+      await open('/?q=drone');
+      expect(tour()).toBeNull();
+    });
+
+    it('is hidden once a search runs', async () => {
+      await open();
+      expect(tour()).not.toBeNull();
+
+      await submit('robots');
+      expect(tour()).toBeNull();
+      await respond(resultOf(1, papers(1)));
+      expect(tour()).toBeNull();
+    });
+
+    it('can be dismissed, which moves focus to the search box and is remembered', async () => {
+      await open();
+
+      dismiss().click();
+      await stable();
+
+      expect(tour()).toBeNull();
+      expect(document.activeElement).toBe(input());
+      expect(localStorage.getItem(REVIEWER_TOUR_STORAGE_KEY)).toBe('true');
+    });
+
+    it('stays hidden on a later visit once dismissed', async () => {
+      localStorage.setItem(REVIEWER_TOUR_STORAGE_KEY, 'true');
+      await open();
+
+      expect(el.querySelector('app-reviewer-tour')).toBeNull();
+      expect(results().textContent).toContain('Search to begin');
     });
   });
 

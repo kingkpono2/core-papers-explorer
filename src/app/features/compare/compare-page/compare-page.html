@@ -1,0 +1,265 @@
+<section class="panel" aria-labelledby="compare-heading">
+  <h1 id="compare-heading">Compare research trends</h1>
+  <p class="intro">
+    See how many papers on two or three topics were published each year, counted across every match
+    in CORE.
+  </p>
+
+  <form class="form" novalidate (submit)="submit($event)">
+    @for (draft of drafts(); track $index; let i = $index) {
+      @let list = fieldProblems()[i];
+      <div class="field">
+        <label class="field__label" [for]="'compare-q' + i">
+          <svg class="key" viewBox="-6 -6 12 12" aria-hidden="true" focusable="false">
+            @switch (i) {
+              @case (0) {
+                <circle class="series-1" r="4.5" />
+              }
+              @case (1) {
+                <rect class="series-2" x="-4" y="-4" width="8" height="8" />
+              }
+              @default {
+                <path class="series-3" d="M0,-5.5L5,3.5H-5Z" />
+              }
+            }
+          </svg>
+          Query {{ i + 1 }}
+        </label>
+        <div class="field__row">
+          <input
+            #field
+            class="field__input"
+            type="search"
+            enterkeyhint="search"
+            autocomplete="off"
+            spellcheck="false"
+            [id]="'compare-q' + i"
+            [value]="draft"
+            [attr.aria-invalid]="list.length && list[0].severity === 'error' ? true : null"
+            [attr.aria-describedby]="list.length ? 'compare-q' + i + '-problems' : null"
+            (input)="edit(i, field.value)"
+          />
+          @if (i >= minCompared) {
+            <button
+              type="button"
+              class="remove"
+              [attr.aria-label]="'Remove query ' + (i + 1)"
+              (click)="remove(i)"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          }
+        </div>
+        @if (list.length) {
+          <ul class="problems" [id]="'compare-q' + i + '-problems'">
+            @for (problem of list; track $index) {
+              <li [class.problem--error]="problem.severity === 'error'">
+                {{ problem.severity === 'error' ? 'Error' : 'Note' }}: {{ problem.message }}
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    }
+
+    @if (formError(); as message) {
+      <p class="form-error" role="alert">{{ message }}</p>
+    }
+
+    <div class="form__actions">
+      <button type="submit" class="button">Compare</button>
+      @if (drafts().length < maxCompared) {
+        <button type="button" class="button button--secondary" (click)="add()">Add a query</button>
+      }
+      <a class="back" routerLink="/">Back to search</a>
+    </div>
+  </form>
+</section>
+
+@let current = view();
+@switch (current.status) {
+  @case ('empty') {
+    <section class="panel results" aria-labelledby="compare-start-heading">
+      <h2 id="compare-start-heading">
+        {{ current.single ? 'Add a second query' : 'Try a comparison' }}
+      </h2>
+      @if (current.single) {
+        <p class="caption">
+          Enter another query to compare with “{{ current.single }}”, or pick an example.
+        </p>
+      }
+      <ul class="examples">
+        @for (example of examples; track $index) {
+          <li>
+            <a class="example" routerLink="/compare" [queryParams]="{ q: example }">
+              @for (query of example; track query; let last = $last) {
+                <code>{{ query }}</code>
+                @if (!last) {
+                  <span class="vs"> vs </span>
+                }
+              }
+            </a>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+  @case ('results') {
+    <section
+      class="panel results"
+      aria-labelledby="trends-heading"
+      [attr.aria-busy]="current.loading"
+    >
+      <header class="header">
+        <h2 id="trends-heading">Publication years</h2>
+        @if (current.chart) {
+          <div class="toggles">
+            @if (!showTable()) {
+              <button
+                type="button"
+                class="toggle"
+                [attr.aria-pressed]="relative()"
+                (click)="relative.set(!relative())"
+              >
+                Relative to each peak
+              </button>
+            }
+            <button
+              type="button"
+              class="toggle"
+              [attr.aria-pressed]="showTable()"
+              (click)="showTable.set(!showTable())"
+            >
+              Show as table
+            </button>
+          </div>
+        }
+      </header>
+      <p class="caption">
+        @if (relative() && !showTable()) {
+          Each query's papers per year as a share of its busiest year shown, so topics of different
+          sizes can be compared.
+        } @else {
+          Matching papers per year of publication over the last {{ current.rows.length || 15 }}
+          years, from CORE. Each query is counted in one request.
+        }
+      </p>
+
+      <div class="insights" aria-live="polite">
+        @if (current.insights.length) {
+          <ul class="insights__list">
+            @for (insight of current.insights; track insight.label) {
+              <li>{{ insight.sentence }}</li>
+            }
+          </ul>
+        }
+        @if (current.comparison) {
+          <p class="comparison">{{ current.comparison }}</p>
+        }
+      </div>
+
+      <ul class="statuses">
+        @for (series of current.series; track series.query) {
+          @switch (series.state.status) {
+            @case ('loading') {
+              <li class="status">Counting papers for “{{ series.query }}”…</li>
+            }
+            @case ('invalid') {
+              <li class="status status--error">
+                “{{ series.query }}” was not compared: {{ series.state.message }}
+              </li>
+            }
+            @case ('error') {
+              <li class="status status--error" role="alert">
+                “{{ series.query }}” could not be counted. {{ series.state.error.message }}
+                @if (series.state.error.kind !== 'bad-query') {
+                  <button
+                    type="button"
+                    class="button button--secondary button--small"
+                    (click)="retry(series.load)"
+                  >
+                    Retry
+                  </button>
+                }
+              </li>
+            }
+          }
+          @if (series.adjustment; as adjusted) {
+            <li class="notice">
+              “{{ series.query }}” was sent as <code>{{ adjusted.sent }}</code
+              >.
+              @switch (adjusted.change) {
+                @case ('nested-or') {
+                  CORE ignores an OR group nested inside other brackets, so the outer brackets were
+                  removed.
+                }
+                @case ('outer-brackets') {
+                  The brackets around the whole query make no difference, so they were removed.
+                }
+                @case ('phrase') {
+                  CORE fails on a search that is only a quoted phrase, so it was put in brackets.
+                }
+              }
+            </li>
+          }
+        }
+      </ul>
+
+      @if (current.chart; as chart) {
+        @if (showTable()) {
+          <div class="table-wrap">
+            <table class="table">
+              <caption class="visually-hidden">
+                Matching papers per publication year, per query
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Year</th>
+                  @for (line of chart.lines; track line.key) {
+                    <th scope="col">{{ line.label }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of current.rows; track row.label) {
+                  <tr>
+                    <th scope="row">{{ row.label }}</th>
+                    @for (count of row.counts; track $index) {
+                      <td>{{ count }}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <app-line-chart
+            [categories]="chart.categories"
+            [series]="chart.lines"
+            [label]="
+              relative()
+                ? 'Papers per publication year as a share of each query’s peak'
+                : 'Matching papers per publication year, per query'
+            "
+            [axisSuffix]="relative() ? '%' : ''"
+          />
+        }
+        <ul class="notes">
+          @if (current.partialYear) {
+            <li>{{ current.partialYear }} is the year so far.</li>
+          }
+          @for (note of current.earlier; track note.slot) {
+            <li>{{ note.text }}</li>
+          }
+        </ul>
+      } @else if (current.empty) {
+        <p class="caption">None of the matching papers has a publication year to chart.</p>
+      } @else if (current.loading) {
+        <p class="visually-hidden">Counting papers per year…</p>
+        <div class="skeleton" aria-hidden="true"></div>
+      }
+    </section>
+  }
+}
