@@ -75,7 +75,7 @@ Engineering
 - A Vercel function in front of CORE that keeps the API key on the server, lets the CDN cache
   searches for five minutes and only allows the two endpoints the app uses (see
   [Deployment](#deployment))
-- 321 unit tests (Karma) and 34 tests for the serverless function (`node --test`), run with lint,
+- 331 unit tests (Karma) and 34 tests for the serverless function (`node --test`), run with lint,
   format check and a production build on every push by GitHub Actions
 - Deployed on Vercel with preview deployments for branches
 
@@ -88,7 +88,9 @@ Engineering
   CDN; the deployed function uses an API key.
 - **Nested OR groups are ignored.** `(drone AND (package OR delivery))` returns every drone paper
   (71,213), because CORE drops an OR group inside other brackets. The app removes brackets around
-  the whole query (4,729 papers) and warns about any nesting that remains.
+  the whole query (4,729 papers) and warns about any nesting that remains. When it changes a query
+  this way, or brackets a lone quoted phrase (which CORE fails on), a note by the result count says
+  what was sent and why.
 - **Malformed queries.** Some, such as an unknown field or a range in square brackets, make CORE
   fail with a `500` ("Azure search failed with status code: 400"); others quietly return results
   for something else. The app validates queries first, and treats those `500`s as bad queries that

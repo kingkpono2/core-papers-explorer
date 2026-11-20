@@ -69,6 +69,12 @@ code {
   margin: 0;
   padding-left: var(--space-5);
 
+  // Where "Why?" by the results lands, so it shows even after a mouse click.
+  li:focus {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
   li + li {
     margin-top: var(--space-1);
   }

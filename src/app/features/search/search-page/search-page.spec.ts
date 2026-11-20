@@ -279,6 +279,76 @@ describe('SearchPage', () => {
     });
   });
 
+  describe('notice of a changed query', () => {
+    const status = () => el.querySelector<HTMLElement>('.results__header .adjusted')!;
+    const notice = () => status().querySelector<HTMLElement>('.notice');
+    const text = () => notice()?.textContent?.replace(/\s+/g, ' ').trim();
+
+    beforeEach(() => open());
+
+    it('says what was sent when the outer brackets are removed, and why', async () => {
+      await submit('(drone AND (package OR delivery))');
+      await respond(resultOf(4729, papers(10)));
+
+      expect(notice()?.querySelector('code')?.textContent).toBe('drone AND (package OR delivery)');
+      expect(text()).toContain('Searched for drone AND (package OR delivery).');
+      expect(text()).toContain(
+        'The outer brackets were removed because CORE ignores an OR group nested inside other brackets',
+      );
+      expect(input().value).toBe('(drone AND (package OR delivery))');
+    });
+
+    it('is a polite status region that exists before the notice appears', async () => {
+      expect(status().getAttribute('role')).toBe('status');
+      expect(notice()).toBeNull();
+
+      await submit('(drone AND (package OR delivery))');
+      // Shown as soon as the search starts, in the region that was already there.
+      expect(notice()).toBeTruthy();
+      expect(notice()!.closest('[role="status"]')).toBe(status());
+    });
+
+    it('explains bracketing a lone phrase differently', async () => {
+      await submit('"drone delivery"');
+      await respond(resultOf(12, papers(10)));
+
+      expect(notice()?.querySelector('code')?.textContent).toBe('("drone delivery")');
+      expect(text()).toContain('CORE fails on a search that is only a quoted phrase');
+      expect(text()).not.toContain('outer brackets');
+    });
+
+    it('is not shown for a query sent as written', async () => {
+      for (const query of ['drone AND (package OR delivery)', 'drone']) {
+        await submit(query);
+        await respond(resultOf(5, papers(5)));
+        expect(notice()).withContext(query).toBeNull();
+      }
+    });
+
+    it('goes away when the query no longer needs changing', async () => {
+      await submit('(drone AND (package OR delivery))');
+      await respond(resultOf(4729, papers(10)));
+      expect(notice()).toBeTruthy();
+
+      await submit('drone');
+      await respond(resultOf(71213, papers(10)));
+      expect(notice()).toBeNull();
+    });
+
+    it('opens How to search at the matching note on Why?', async () => {
+      await submit('(drone AND (package OR delivery))');
+      await respond(resultOf(4729, papers(10)));
+      const toggle = el.querySelector<HTMLButtonElement>('.help-toggle')!;
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+      notice()!.querySelector<HTMLButtonElement>('button')!.click();
+      await stable();
+
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(document.activeElement?.id).toBe('search-help-nested-or');
+    });
+  });
+
   describe('one request per action', () => {
     it('sends a single request per search', async () => {
       await open();

@@ -1,4 +1,4 @@
-import { narrowQuery, toCoreQuery } from './core-query';
+import { coreQueryAdjustment, narrowQuery, toCoreQuery } from './core-query';
 
 describe('toCoreQuery', () => {
   const cases: [string, string][] = [
@@ -20,6 +20,39 @@ describe('toCoreQuery', () => {
       expect(toCoreQuery(query)).toBe(expected);
     });
   }
+});
+
+describe('coreQueryAdjustment', () => {
+  it('explains removing brackets that would nest an OR group', () => {
+    expect(coreQueryAdjustment('(drone AND (package OR delivery))')).toEqual({
+      sent: 'drone AND (package OR delivery)',
+      change: 'nested-or',
+    });
+    expect(coreQueryAdjustment('(drone AND NOT (uav OR quadcopter))')?.change).toBe('nested-or');
+  });
+
+  it('explains removing brackets that change nothing', () => {
+    expect(coreQueryAdjustment(' ( drone ) ')).toEqual({ sent: 'drone', change: 'outer-brackets' });
+    expect(coreQueryAdjustment('(drone OR uav)')?.change).toBe('outer-brackets');
+  });
+
+  it('explains bracketing a lone phrase', () => {
+    expect(coreQueryAdjustment('"drone delivery"')).toEqual({
+      sent: '("drone delivery")',
+      change: 'phrase',
+    });
+  });
+
+  it('is null when the query is sent as written, whitespace aside', () => {
+    for (const query of [
+      'drone',
+      'drone AND (package OR delivery)',
+      '("drone delivery")',
+      'drone  and   delivery',
+    ]) {
+      expect(coreQueryAdjustment(query)).withContext(query).toBeNull();
+    }
+  });
 });
 
 describe('narrowQuery', () => {

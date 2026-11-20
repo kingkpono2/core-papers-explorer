@@ -27,7 +27,7 @@ import { ChartSearch, YearChart } from '../chart/year-chart/year-chart';
 import { ExportMenu } from '../export/export-menu/export-menu';
 import { PageSizePreference } from '../page-size-preference';
 import { MAX_RESULTS, lastPage, pageOffset, resultRange } from '../paging';
-import { toCoreQuery } from '../query/core-query';
+import { CoreQueryChange, coreQueryAdjustment, toCoreQuery } from '../query/core-query';
 import { analyseQuery, positiveTerms } from '../query/query-analyser';
 import { RecentSearches } from '../recent-searches';
 import { SearchBar } from '../search-bar/search-bar';
@@ -82,6 +82,7 @@ export class SearchPage {
   private readonly reloads = new Subject<void>();
   private readonly queryParamMap = toSignal(this.route.queryParamMap, { requireSync: true });
   private readonly resultsHeading = viewChild.required<ElementRef<HTMLElement>>('resultsHeading');
+  private readonly searchBar = viewChild.required(SearchBar);
 
   protected readonly examples = [
     '(drone AND (package OR delivery))',
@@ -162,6 +163,17 @@ export class SearchPage {
     return { last: lastPage(total, state.params.size), capped: total > MAX_RESULTS };
   });
 
+  /**
+   * How the query sent to CORE differs from the one written, if it does. The box and the URL keep
+   * what the user wrote, so this is the only place that says what was searched.
+   */
+  protected readonly adjustment = computed(() => {
+    const state = this.state();
+    return state.status === 'idle' || state.status === 'invalid'
+      ? null
+      : coreQueryAdjustment(state.params.query);
+  });
+
   /** Read out by the live region. Errors are announced by the error state's own alert. */
   protected readonly summary = computed(() => {
     const state = this.state();
@@ -235,6 +247,11 @@ export class SearchPage {
     const size = toPageSize(value) ?? DEFAULT_PAGE_SIZE;
     this.pageSizePreference.set(size);
     this.navigate({ ...this.params(), size, page: 1 });
+  }
+
+  /** Opens How to search at the note on the CORE quirk behind a change to the query. */
+  protected explain(change: CoreQueryChange): void {
+    this.searchBar().showHelp(change === 'phrase' ? 'search-help-phrase' : 'search-help-nested-or');
   }
 
   protected reload(): void {
