@@ -247,6 +247,16 @@ describe('SearchPage', () => {
       expect(el.querySelector('app-export-menu')).toBeNull();
     });
 
+    it('offers to compare the search with others', async () => {
+      await submit('drone AND delivery');
+      await respond(resultOf(30, papers(10)));
+
+      const compare = [...el.querySelectorAll<HTMLAnchorElement>('.results__actions a')].find(
+        (a) => a.textContent?.trim() === 'Compare with…',
+      );
+      expect(compare?.getAttribute('href')).toBe('/compare?q=drone%20AND%20delivery');
+    });
+
     it('offers to share the search and export the papers on the page', async () => {
       await submit('drone');
       expect(el.querySelector('.results__actions')).toBeNull();
@@ -561,8 +571,12 @@ describe('SearchPage', () => {
       const steps = [...el.querySelectorAll('app-reviewer-tour ol > li .tour__action')];
       expect(steps.map((s) => s.textContent?.trim())).toEqual([
         'Run the brief’s example',
+        'Compare research trends',
         'See how queries are checked',
       ]);
+      expect(step('Compare research trends').getAttribute('href')).toBe(
+        '/compare?q=drone%20AND%20delivery&q=autonomous%20AND%20vehicles',
+      );
     });
 
     it('runs the brief’s example, which explains the bracket fix, and is then hidden', async () => {

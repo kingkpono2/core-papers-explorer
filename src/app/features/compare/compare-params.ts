@@ -3,6 +3,13 @@ import { normaliseQuery } from '../search/query/query-analyser';
 
 export const MAX_COMPARED = 3;
 export const MIN_COMPARED = 2;
+/** Pairs worth comparing, offered before anything has been entered. */
+export const COMPARE_EXAMPLES: readonly (readonly string[])[] = [
+  ['drone AND delivery', 'autonomous AND vehicles'],
+  ['(drone AND (package OR delivery))', 'drone'],
+  ['solar AND energy', 'wind AND energy', 'nuclear AND energy'],
+];
+
 /** Far longer than any real query; anything longer is not worth sending. */
 const MAX_QUERY_LENGTH = 1_000;
 

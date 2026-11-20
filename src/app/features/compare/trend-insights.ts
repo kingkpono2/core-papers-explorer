@@ -115,18 +115,42 @@ export function trendInsight(
   };
 }
 
+export interface ComparedSeries {
+  label: string;
+  /** One count per year in `years`. */
+  values: readonly number[];
+}
+
 /**
- * One sentence comparing how fast the series grew, or null when fewer than two have a meaningful
- * ratio.
+ * One sentence comparing how fast the series grew to the last full year, or null when fewer than two
+ * have data. Growth is measured from the first year shown, or, when a series has too few papers
+ * then for a multiplier to mean much, from the first year in which every series has enough.
  */
-export function compareGrowth(insights: readonly TrendInsight[]): string | null {
-  const ranked = insights
-    .filter((insight) => insight.growth?.ratio != null)
-    .map((insight) => ({ label: insight.label, ratio: insight.growth!.ratio! }))
-    .sort((a, b) => b.ratio - a.ratio);
-  if (ranked.length < 2) {
+export function compareGrowth(
+  series: readonly ComparedSeries[],
+  years: readonly number[],
+  currentYear: number,
+): string | null {
+  if (series.length < 2) {
     return null;
   }
+  const end = years.reduce((last, year, i) => (year < currentYear ? i : last), -1);
+  const base = years.findIndex(
+    (_, i) => i < end && series.every(({ values }) => values[i] >= MIN_GROWTH_BASE),
+  );
+  if (end === -1 || base === -1) {
+    return null;
+  }
+  const ranked = series
+    .map(({ label, values }) => ({ label, ratio: values[end] / values[base] }))
+    .sort((a, b) => b.ratio - a.ratio);
+  const sentence = rank(ranked);
+  return base === 0
+    ? sentence
+    : `Measured from ${years[base]}, when each had at least ${MIN_GROWTH_BASE} papers, ${sentence}`;
+}
+
+function rank(ranked: readonly { label: string; ratio: number }[]): string {
   const [top, ...rest] = ranked;
   if (ranked.length === 2) {
     const [, second] = ranked;

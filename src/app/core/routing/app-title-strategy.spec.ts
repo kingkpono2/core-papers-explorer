@@ -33,6 +33,14 @@ describe('AppTitleStrategy', () => {
     expect(title()).toBe(APP_TITLE);
   });
 
+  it('names the compare page with the queries it compares', async () => {
+    await router.navigateByUrl('/compare?q=drone&q=robots');
+    expect(title()).toBe('drone vs robots — Compare trends — CORE Papers Explorer');
+
+    await router.navigateByUrl('/compare');
+    expect(title()).toBe('Compare trends — CORE Papers Explorer');
+  });
+
   it('sends unknown paths to the search page', async () => {
     await router.navigateByUrl('/no/such/page');
 

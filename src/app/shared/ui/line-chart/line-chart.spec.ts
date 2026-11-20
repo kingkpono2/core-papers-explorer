@@ -179,6 +179,15 @@ describe('LineChart', () => {
     hits()[3].dispatchEvent(new MouseEvent('mouseenter'));
     await fixture.whenStable();
     expect(el.querySelector('.tooltip')?.classList).toContain('tooltip--left');
+
+    await render(
+      years(2020, 4),
+      two.map((s) => ({ ...s, values: [1, 2, 3, 4] })),
+      360,
+    );
+    hits()[1].dispatchEvent(new MouseEvent('mouseenter'));
+    await fixture.whenStable();
+    expect(el.querySelector('.tooltip')?.classList).toContain('tooltip--below');
   });
 
   it('enlarges the markers of the active year in place', async () => {

@@ -2,6 +2,18 @@
   <div class="container header__inner">
     <a class="brand" routerLink="/">CORE Papers Explorer</a>
     <p class="tagline">Search open-access research papers</p>
+    <nav class="nav" aria-label="Main">
+      <a
+        routerLink="/"
+        routerLinkActive="is-active"
+        ariaCurrentWhenActive="page"
+        [routerLinkActiveOptions]="exactPath"
+        >Search</a
+      >
+      <a routerLink="/compare" routerLinkActive="is-active" ariaCurrentWhenActive="page"
+        >Compare trends</a
+      >
+    </nav>
     <app-theme-toggle class="theme" />
   </div>
 </header>

@@ -137,6 +137,11 @@
     transform: translateX(-100%);
   }
 
+  &--below {
+    right: 0;
+    max-width: none;
+  }
+
   p {
     margin: 0;
   }
@@ -148,9 +153,9 @@
 
 .tooltip__row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: baseline;
-  gap: var(--space-2);
+  column-gap: var(--space-2);
 }
 
 .tooltip__marker {
@@ -164,5 +169,6 @@
 }
 
 .tooltip__value {
+  grid-column: 2;
   font-weight: 600;
 }

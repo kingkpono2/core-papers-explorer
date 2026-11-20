@@ -44,6 +44,8 @@ const LABEL_WIDTH = 40;
 const DIGIT_WIDTH = 7.5;
 /** Space between the crosshair and the tooltip beside it. */
 const TOOLTIP_OFFSET = 12;
+/** Narrower charts have no room beside the crosshair, so the tooltip goes under the axis. */
+const TOOLTIP_BESIDE_MIN_WIDTH = 480;
 
 /**
  * A responsive line chart for up to three series over shared categories, drawn as SVG at the width
@@ -140,6 +142,7 @@ export class LineChart {
       return null;
     }
     const flip = column.center > layout.width / 2;
+    const below = layout.width < TOOLTIP_BESIDE_MIN_WIDTH;
     return {
       heading: column.category.description,
       rows: this.series().map((series) => ({
@@ -148,9 +151,10 @@ export class LineChart {
         label: series.label,
         value: this.valueText(series, index),
       })),
-      x: column.center + (flip ? -TOOLTIP_OFFSET : TOOLTIP_OFFSET),
-      y: layout.top,
-      flip,
+      x: below ? 0 : column.center + (flip ? -TOOLTIP_OFFSET : TOOLTIP_OFFSET),
+      y: below ? HEIGHT : layout.top,
+      flip: flip && !below,
+      below,
     };
   });
 

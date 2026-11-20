@@ -1,5 +1,5 @@
 import { YearCounts } from '../../core/models/paper';
-import { TrendInsight, alignTrends, change, compareGrowth, trendInsight } from './trend-insights';
+import { alignTrends, change, compareGrowth, trendInsight } from './trend-insights';
 
 const counts = (entries: Record<number, number>, truncated = false): YearCounts => ({
   counts: Object.entries(entries).map(([year, count]) => ({ year: Number(year), count })),
@@ -137,55 +137,69 @@ describe('trendInsight', () => {
 });
 
 describe('compareGrowth', () => {
-  const withRatio = (label: string, ratio: number | null): TrendInsight => ({
+  const YEARS = [2024, 2025, 2026];
+  /** Grows by `ratio` from 2024 to 2025, the last full year; 2026 is the year so far. */
+  const growing = (label: string, ratio: number) => ({
     label,
-    dated: 100,
-    truncated: false,
-    peakYear: 2025,
-    growth: {
-      from: { year: 2012, count: 10 },
-      to: { year: 2025, count: 10 },
-      ratio,
-    },
-    sentence: '',
+    values: [100, Math.round(100 * ratio * 1000) / 1000, 1],
   });
+  const compare = (...series: ReturnType<typeof growing>[]) => compareGrowth(series, YEARS, 2026);
 
-  it('says which of two grew faster', () => {
-    expect(
-      compareGrowth([withRatio('autonomous vehicles', 3.14), withRatio('drone delivery', 8.2)]),
-    ).toBe('drone delivery grew faster than autonomous vehicles (8.2× vs 3.1×).');
+  it('says which of two grew faster, ignoring the year so far', () => {
+    expect(compare(growing('autonomous vehicles', 3.14), growing('drone delivery', 8.2))).toBe(
+      'drone delivery grew faster than autonomous vehicles (8.2× vs 3.1×).',
+    );
   });
 
   it('contrasts growth with decline, and two declines', () => {
-    expect(compareGrowth([withRatio('a', 2), withRatio('b', 0.6)])).toBe(
+    expect(compare(growing('a', 2), growing('b', 0.6))).toBe(
       'a grew (2.0×) while b shrank (down 40%).',
     );
-    expect(compareGrowth([withRatio('a', 0.8), withRatio('b', 0.5)])).toBe(
+    expect(compare(growing('a', 0.8), growing('b', 0.5))).toBe(
       'b shrank faster than a (down 50% vs down 20%).',
     );
   });
 
   it('calls close rates about the same', () => {
-    expect(compareGrowth([withRatio('a', 3.0), withRatio('b', 3.1)])).toBe(
+    expect(compare(growing('a', 3.0), growing('b', 3.1))).toBe(
       'b and a changed at about the same rate (3.1× and 3.0×).',
     );
   });
 
   it('ranks three', () => {
-    expect(compareGrowth([withRatio('a', 1.2), withRatio('b', 8.2), withRatio('c', 3.1)])).toBe(
+    expect(compare(growing('a', 1.2), growing('b', 8.2), growing('c', 3.1))).toBe(
       'b grew fastest (8.2×), ahead of c (3.1×) and a (1.2×).',
     );
-    expect(compareGrowth([withRatio('a', 0.5), withRatio('b', 0.9), withRatio('c', 0.7)])).toBe(
+    expect(compare(growing('a', 0.5), growing('b', 0.9), growing('c', 0.7))).toBe(
       'b held up best (down 10%), ahead of c (down 30%) and a (down 50%).',
     );
   });
 
-  it('skips series without a meaningful ratio, and needs two that have one', () => {
-    expect(compareGrowth([withRatio('a', null), withRatio('b', 2)])).toBeNull();
-    expect(compareGrowth([withRatio('a', null), withRatio('b', 2), withRatio('c', 4)])).toBe(
-      'c grew faster than b (4.0× vs 2.0×).',
+  it('starts from the first year in which every series has enough papers', () => {
+    const years = [2012, 2013, 2014, 2015];
+    const series = [
+      { label: 'a', values: [1, 5, 10, 120] },
+      { label: 'b', values: [50, 60, 20, 40] },
+    ];
+
+    expect(compareGrowth(series, years, 2026)).toBe(
+      'Measured from 2014, when each had at least 10 papers, a grew faster than b (12× vs 2.0×).',
     );
-    expect(compareGrowth([{ ...withRatio('a', 1), growth: null }, withRatio('b', 2)])).toBeNull();
+  });
+
+  it('gives no comparison without a common base, a full year after it, or a second series', () => {
+    expect(
+      compareGrowth(
+        [
+          { label: 'a', values: [0, 3, 9] },
+          { label: 'b', values: [50, 60, 70] },
+        ],
+        [2023, 2024, 2025],
+        2026,
+      ),
+    ).toBeNull();
+    expect(compareGrowth([growing('a', 2), growing('b', 3)], [2025, 2026, 2027], 2026)).toBeNull();
+    expect(compare(growing('a', 2))).toBeNull();
   });
 });
 

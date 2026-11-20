@@ -25,6 +25,14 @@
       </span>
     </li>
     <li>
+      <a class="tour__action" routerLink="/compare" [queryParams]="{ q: comparison }"
+        >Compare research trends</a
+      >
+      <span class="tour__detail">
+        Publication trends for two or three queries in one chart, with growth worked out.
+      </span>
+    </li>
+    <li>
       <button type="button" class="tour__action" (click)="helpRequested.emit()">
         See how queries are checked
       </button>
