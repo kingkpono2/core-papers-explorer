@@ -30,6 +30,7 @@
         <h2 id="results-heading" #resultsHeading tabindex="-1">Results</h2>
         @if (current.status === 'success' && current.result.papers.length) {
           <div class="results__actions">
+            <app-view-switch [query]="current.params.query" current="results" />
             <a
               class="button button--secondary button--small"
               routerLink="/compare"

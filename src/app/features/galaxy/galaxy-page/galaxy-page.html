@@ -1,0 +1,103 @@
+<section class="panel" aria-labelledby="galaxy-heading">
+  <h1 id="galaxy-heading">Research galaxy</h1>
+  <p class="intro">
+    The 100 papers CORE ranks as most relevant to a search, grouped into topics by the words in
+    their titles and abstracts and drawn as a night sky. Press Play to watch the topics form, year
+    by year.
+  </p>
+  <app-search-bar [query]="query()" action="Map it" (searched)="map($event)" />
+</section>
+
+@let current = state();
+@if (current.status !== 'idle') {
+  <div class="context">
+    <app-view-switch [query]="current.query" current="galaxy" />
+    <p class="summary" aria-live="polite">{{ summary() }}</p>
+  </div>
+  <!-- A status region, so a change to the query is read out without interrupting. -->
+  <div role="status">
+    @if (adjustment(); as adjusted) {
+      <p class="notice">
+        Searched for <code>{{ adjusted.sent }}</code
+        >.
+        @switch (adjusted.change) {
+          @case ('nested-or') {
+            CORE ignores an OR group nested inside other brackets, so the outer brackets were
+            removed.
+          }
+          @case ('outer-brackets') {
+            The brackets around the whole query make no difference, so they were removed.
+          }
+          @case ('phrase') {
+            CORE fails on a search that is only a quoted phrase, so it was put in brackets.
+          }
+        }
+        <button type="button" class="link-button" (click)="openHelp()">Why?</button>
+      </p>
+    }
+  </div>
+}
+
+@if (
+  current.status === 'loading' ||
+  (current.status === 'success' && current.papers.length >= minPapers)
+) {
+  <app-galaxy-map
+    class="map"
+    [papers]="current.status === 'success' ? current.papers : null"
+    [query]="current.query"
+    [total]="current.status === 'success' ? current.total : null"
+    [merged]="current.status === 'success' ? current.merged : 0"
+  />
+}
+
+@switch (current.status) {
+  @case ('idle') {
+    <app-empty-state
+      class="state"
+      heading="Pick a search to map"
+      [examples]="examples"
+      (exampleSelected)="map($event)"
+    >
+      See the topics inside a search, and which of them are growing.
+    </app-empty-state>
+  }
+  @case ('invalid') {
+    <app-empty-state class="state" heading="Check the search">
+      This search has a problem, shown under the search box, so it was not sent to CORE.
+    </app-empty-state>
+  }
+  @case ('error') {
+    <app-error-state class="state" [error]="current.error" (retry)="reload()" />
+  }
+  @case ('success') {
+    @if (!current.papers.length) {
+      <app-empty-state class="state" heading="No papers found">
+        Nothing matched “{{ current.query }}”. Check the spelling, or try fewer or broader keywords.
+      </app-empty-state>
+    } @else if (current.papers.length < minPapers) {
+      <section class="panel few" aria-labelledby="few-heading">
+        <h2 id="few-heading">Too few papers for a galaxy</h2>
+        <p class="few__text">
+          Only {{ current.papers.length }}
+          {{ current.papers.length === 1 ? 'paper matches' : 'papers match' }}, and finding topics
+          takes at least {{ minPapers }}. Here
+          {{ current.papers.length === 1 ? 'it is' : 'they are' }}; a broader search will draw a
+          galaxy.
+        </p>
+        <ol class="few__list">
+          @for (paper of current.papers; track paper.id) {
+            <li>
+              <a [href]="paper.sourceUrl" target="_blank" rel="noopener noreferrer"
+                >{{ paper.title }}<span class="visually-hidden"> (opens in a new tab)</span></a
+              >
+              @if (paper.year) {
+                <span class="few__year">{{ paper.year }}</span>
+              }
+            </li>
+          }
+        </ol>
+      </section>
+    }
+  }
+}

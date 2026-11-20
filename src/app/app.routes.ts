@@ -14,5 +14,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/compare/compare-page/compare-page').then((m) => m.ComparePage),
   },
+  {
+    path: 'galaxy',
+    title: `Research galaxy — ${APP_TITLE}`,
+    loadComponent: () =>
+      import('./features/galaxy/galaxy-page/galaxy-page').then((m) => m.GalaxyPage),
+  },
   { path: '**', redirectTo: '' },
 ];

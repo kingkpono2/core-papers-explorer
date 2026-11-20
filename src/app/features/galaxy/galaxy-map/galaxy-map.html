@@ -1,0 +1,170 @@
+@let current = galaxy();
+@let all = papers();
+<section
+  class="galaxy theme-dark"
+  aria-labelledby="galaxy-map-heading"
+  [attr.aria-busy]="!current && analysis().status !== 'failed'"
+>
+  <header class="header">
+    <div class="header__text">
+      <h2 id="galaxy-map-heading">Topics in “{{ query() }}”</h2>
+      <p class="caption">
+        @if (current && all) {
+          {{ all.length }} papers in {{ current.topics.length }}
+          {{ current.topics.length === 1 ? 'topic' : 'topics' }}
+          @if (span(); as s) {
+            from {{ s.first }} to {{ s.last }}.
+          }
+          Bigger, brighter stars are newer; each topic has its own colour and shape.
+        } @else if (all) {
+          Finding topics in {{ all.length }} papers…
+        } @else {
+          Fetching the most relevant papers from CORE…
+        }
+      </p>
+    </div>
+    @if (current) {
+      <button
+        type="button"
+        class="toggle"
+        [attr.aria-pressed]="showList()"
+        (click)="showList.set(!showList())"
+      >
+        List view
+      </button>
+    }
+  </header>
+
+  <div #frame class="frame" [hidden]="showList() && !!current">
+    @if (current && all) {
+      <app-galaxy-sky
+        class="sky"
+        [result]="current"
+        [papers]="all"
+        [visible]="visible()"
+        [year]="span() ? year() : null"
+        [playing]="playing()"
+        [selected]="selected()"
+        [query]="query()"
+        [reducedMotion]="reducedMotion()"
+        (topicSelected)="select($event)"
+        (cleared)="selected.set(null)"
+      />
+    } @else {
+      <div class="placeholder" aria-hidden="true">
+        @for (star of placeholder; track $index) {
+          <span
+            class="placeholder__star"
+            [class.placeholder__star--big]="star.big"
+            [style.left.%]="star.x"
+            [style.top.%]="star.y"
+            [style.animation-delay.ms]="$index * 37"
+          ></span>
+        }
+      </div>
+      @if (analysis().status === 'failed') {
+        <div class="frame__message" role="alert">
+          <p>The galaxy could not be drawn.</p>
+          <button type="button" class="button button--secondary button--small" (click)="retry()">
+            Retry
+          </button>
+        </div>
+      } @else {
+        <p class="frame__message frame__message--quiet">
+          {{ all ? 'Finding topics…' : 'Fetching papers…' }}
+        </p>
+      }
+    }
+  </div>
+
+  @if (current && all) {
+    @if (showList()) {
+      <app-galaxy-topic-list
+        [topics]="current.topics"
+        [papers]="all"
+        [since]="current.highlights.since"
+      />
+    } @else if (span(); as s) {
+      <div class="timeline">
+        <button
+          type="button"
+          class="play"
+          [attr.aria-label]="playing() ? 'Pause the time-lapse' : 'Play the time-lapse'"
+          (click)="togglePlay()"
+        >
+          <svg class="play__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            @if (playing()) {
+              <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" />
+            } @else {
+              <path d="M8 5.5v13l10.5-6.5z" />
+            }
+          </svg>
+          {{ playing() ? 'Pause' : 'Play' }}
+        </button>
+        <label class="visually-hidden" for="galaxy-year">Year shown</label>
+        <input
+          #slider
+          id="galaxy-year"
+          class="slider"
+          type="range"
+          step="1"
+          [min]="s.first"
+          [max]="s.last"
+          [value]="year()"
+          [attr.aria-valuetext]="valueText()"
+          (input)="scrub(slider.value)"
+        />
+        <span class="timeline__ends" aria-hidden="true">{{ s.first }}–{{ s.last }}</span>
+      </div>
+    }
+
+    <div class="insight">
+      @if (!complete() || playing()) {
+        <p>
+          <strong>{{ year() }}</strong> · {{ shown() | number }} of {{ all.length | number }} papers
+          so far
+        </p>
+      } @else if (insight(); as i) {
+        <p>
+          <strong>{{ i.topics }} {{ i.topics === 1 ? 'topic' : 'topics' }}</strong>
+          @if (i.growing; as g) {
+            · fastest-growing: <strong>{{ g.label }}</strong> ({{ g.share }}% of its papers since
+            {{ i.since }})
+          }
+          @if (i.established; as e) {
+            · most established: <strong>{{ e.label }}</strong> (median year {{ e.year }})
+          }
+        </p>
+      }
+    </div>
+    <p class="visually-hidden" aria-live="polite">{{ announcement() }}</p>
+
+    @if (!showList()) {
+      <app-galaxy-legend
+        class="legend"
+        [topics]="current.topics"
+        [counts]="counts()"
+        [highlights]="current.highlights"
+        [selected]="selected()"
+        [query]="query()"
+        [papers]="all"
+        (selectedChange)="select($event)"
+      />
+    }
+
+    <p class="footnote" [attr.title]="timingDetail()">
+      Topics found in {{ current.timings.total | number: '1.0-0' }} ms{{
+        current.thread === 'worker' ? ' in a background thread' : ''
+      }}: words weighted by TF-IDF, grouped by spherical k-means into the number of topics with the
+      best silhouette, and named by the words most particular to each. The same search always draws
+      the same map.
+      @if (merged(); as count) {
+        {{ count }} duplicate {{ count === 1 ? 'record' : 'records' }} from CORE
+        {{ count === 1 ? 'was' : 'were' }} merged.
+      }
+      @if (abstractNote(); as note) {
+        {{ note }}
+      }
+    </p>
+  }
+</section>

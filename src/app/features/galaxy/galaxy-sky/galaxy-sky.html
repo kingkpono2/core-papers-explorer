@@ -1,0 +1,154 @@
+@let r = result();
+@let shownStars = visible();
+@let highlighted = selected();
+<svg
+  class="svg"
+  [attr.viewBox]="'0 0 ' + r.width + ' ' + r.height"
+  role="group"
+  [attr.aria-label]="summary()"
+  [attr.aria-describedby]="id + '-keys'"
+>
+  <defs>
+    @for (colour of colours(); track $index) {
+      <radialGradient [attr.id]="id + '-glow-' + $index">
+        <stop offset="0" [attr.stop-color]="colour" stop-opacity="0.85" />
+        <stop offset="0.4" [attr.stop-color]="colour" stop-opacity="0.28" />
+        <stop offset="1" [attr.stop-color]="colour" stop-opacity="0" />
+      </radialGradient>
+      <radialGradient [attr.id]="id + '-nebula-' + $index">
+        <stop offset="0" [attr.stop-color]="colour" stop-opacity="0.26" />
+        <stop offset="0.6" [attr.stop-color]="colour" stop-opacity="0.08" />
+        <stop offset="1" [attr.stop-color]="colour" stop-opacity="0" />
+      </radialGradient>
+    }
+  </defs>
+
+  <!-- Clicking the empty sky clears a highlighted topic (see onClick). -->
+  <rect class="backdrop" aria-hidden="true" [attr.width]="r.width" [attr.height]="r.height" />
+
+  <g aria-hidden="true">
+    @for (layer of backgroundStars(); track $index) {
+      <path class="dust" [class]="'dust--' + $index" [attr.d]="layer" />
+    }
+    @for (nebula of nebulae(); track nebula.topic) {
+      <ellipse
+        class="nebula"
+        [class.is-dimmed]="highlighted !== null && highlighted !== nebula.topic"
+        [attr.cx]="nebula.cx"
+        [attr.cy]="nebula.cy"
+        [attr.rx]="nebula.rx"
+        [attr.ry]="nebula.ry"
+        [attr.fill]="'url(#' + id + '-nebula-' + nebula.topic + ')'"
+        [style.opacity]="nebula.opacity"
+      />
+    }
+    @for (line of constellations(); track line.topic) {
+      <path
+        class="constellation"
+        [class.is-dimmed]="highlighted !== null && highlighted !== line.topic"
+        [class.is-selected]="highlighted === line.topic"
+        [attr.d]="line.d"
+        [attr.stroke]="line.colour"
+      />
+    }
+  </g>
+
+  @for (star of stars(); track star.index) {
+    <a
+      #star
+      class="star"
+      [class.is-hidden]="!shownStars[star.index]"
+      [class.is-dimmed]="highlighted !== null && highlighted !== star.topic"
+      [class.is-new]="playing() && star.year === year()"
+      [attr.href]="star.url"
+      target="_blank"
+      rel="noopener noreferrer"
+      [attr.transform]="star.transform"
+      [attr.tabindex]="focusable() === star.index ? 0 : -1"
+      [attr.aria-label]="star.label"
+      [attr.aria-hidden]="shownStars[star.index] ? null : true"
+      (focus)="focus(star.index)"
+      (blur)="blur(star.index)"
+      (pointerenter)="active.set(star.index)"
+      (pointerleave)="blur(star.index)"
+      (keydown)="onKeydown($event, star.index)"
+    >
+      <circle class="star__hit" [attr.r]="hitRadius" />
+      <g class="star__body">
+        @if (star.glow) {
+          <circle
+            class="star__glow"
+            [attr.r]="star.r * 3.4"
+            [attr.fill]="'url(#' + id + '-glow-' + star.topic + ')'"
+            [style.animation-delay]="star.delay"
+          />
+        }
+        <path class="star__shape" [attr.d]="star.path" [attr.fill]="star.colour" />
+      </g>
+      <circle class="star__ring" [attr.r]="star.r + 5" />
+    </a>
+  }
+
+  @let lit = litTopics();
+  @for (label of labels(); track label.topic) {
+    @if (label.shown) {
+      <g
+        class="label"
+        aria-hidden="true"
+        [class.is-hidden]="!lit[label.topic]"
+        [class.is-dimmed]="highlighted !== null && highlighted !== label.topic"
+        [attr.transform]="'translate(' + label.x + ' ' + label.y + ')'"
+        [attr.data-topic]="label.topic"
+      >
+        <rect
+          class="label__hit"
+          [attr.x]="label.left"
+          y="-10"
+          [attr.width]="-label.left * 2"
+          height="20"
+          rx="10"
+        />
+        <path
+          class="label__glyph"
+          [attr.transform]="'translate(' + (label.left + 10) + ' 0)'"
+          [attr.d]="label.glyph"
+          [attr.fill]="label.colour"
+        />
+        <text class="label__text" [attr.x]="label.left + 20" dy="0.35em">{{ label.text }}</text>
+      </g>
+    }
+  }
+</svg>
+
+@if (year(); as shownYear) {
+  <p class="counter" aria-hidden="true">
+    <span class="counter__year">{{ shownYear }}</span>
+  </p>
+}
+
+<p class="visually-hidden" [id]="id + '-keys'">
+  Each star is a paper. Use the arrow keys to move to the nearest star in that direction, Enter to
+  open the paper and Escape to clear a highlighted topic.
+</p>
+
+@if (tooltip(); as tip) {
+  <div
+    class="tooltip"
+    [class.tooltip--left]="tip.flip"
+    [class.tooltip--below]="tip.below"
+    aria-hidden="true"
+    [style.left.%]="tip.left"
+    [style.top.%]="tip.top"
+  >
+    <p class="tooltip__title">{{ tip.title }}</p>
+    @if (tip.meta) {
+      <p class="tooltip__meta">{{ tip.meta }}</p>
+    }
+    <p class="tooltip__topic">
+      <svg class="tooltip__glyph" viewBox="-8 -8 16 16" aria-hidden="true" focusable="false">
+        <path [attr.d]="tip.path" [attr.fill]="tip.colour" />
+      </svg>
+      {{ tip.topic }}
+    </p>
+  </div>
+}

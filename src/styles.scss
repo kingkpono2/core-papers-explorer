@@ -109,6 +109,11 @@
   }
 }
 
+// A part of the page that is dark in both themes, such as the night sky of the Galaxy.
+.theme-dark {
+  @include dark-theme;
+}
+
 *,
 *::before,
 *::after {

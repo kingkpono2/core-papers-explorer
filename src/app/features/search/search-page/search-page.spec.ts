@@ -257,6 +257,16 @@ describe('SearchPage', () => {
       expect(compare?.getAttribute('href')).toBe('/compare?q=drone%20AND%20delivery');
     });
 
+    it('switches to the Galaxy for the same search', async () => {
+      await submit('drone AND delivery');
+      await respond(resultOf(30, papers(10)));
+
+      const links = [...el.querySelectorAll<HTMLAnchorElement>('app-view-switch a')];
+      expect(links.map((a) => a.textContent?.trim())).toEqual(['Results', 'Galaxy']);
+      expect(links[0].getAttribute('aria-current')).toBe('page');
+      expect(links[1].getAttribute('href')).toBe('/galaxy?q=drone%20AND%20delivery');
+    });
+
     it('offers to share the search and export the papers on the page', async () => {
       await submit('drone');
       expect(el.querySelector('.results__actions')).toBeNull();
@@ -572,10 +582,14 @@ describe('SearchPage', () => {
       expect(steps.map((s) => s.textContent?.trim())).toEqual([
         'Run the brief’s example',
         'Compare research trends',
+        'Open the Galaxy and press Play',
         'See how queries are checked',
       ]);
       expect(step('Compare research trends').getAttribute('href')).toBe(
         '/compare?q=drone%20AND%20delivery&q=autonomous%20AND%20vehicles',
+      );
+      expect(step('Open the Galaxy and press Play').getAttribute('href')).toBe(
+        '/galaxy?q=(drone%20AND%20(package%20OR%20delivery))',
       );
     });
 

@@ -1,0 +1,37 @@
+<div class="list">
+  @for (group of groups(); track $index; let i = $index) {
+    <section class="group" [attr.aria-labelledby]="id + '-' + i">
+      <h3 class="group__heading" [id]="id + '-' + i">
+        <svg class="swatch" viewBox="-8 -8 16 16" aria-hidden="true" focusable="false">
+          <path [attr.d]="group.swatch" [attr.fill]="group.colour" />
+        </svg>
+        {{ group.topic.label }}
+        <span class="group__count"
+          >{{ group.topic.size }} {{ group.topic.size === 1 ? 'paper' : 'papers' }}</span
+        >
+      </h3>
+      <p class="group__stats">
+        <span class="visually-hidden">Shown as a {{ group.shape }}. </span>
+        @if (group.topic.medianYear) {
+          Median year {{ group.topic.medianYear }}.
+        }
+        @if (group.share !== null) {
+          {{ group.share }}% published since {{ since() }}.
+        }
+        @if (group.topic.terms.length) {
+          Words that set it apart: {{ group.topic.terms.join(', ') }}.
+        }
+      </p>
+      <ol class="papers">
+        @for (paper of group.papers; track paper.id) {
+          <li>
+            <a [href]="paper.sourceUrl" target="_blank" rel="noopener noreferrer"
+              >{{ paper.title }}<span class="visually-hidden"> (opens in a new tab)</span></a
+            >
+            <span class="papers__year">{{ paper.year ?? 'year unknown' }}</span>
+          </li>
+        }
+      </ol>
+    </section>
+  }
+</div>
