@@ -1,6 +1,7 @@
 import { Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
 import { ApiErrorKind, toApiError } from '../api/api-error';
 import { RetryNote } from '../api/request-trace';
+import { FaultPlan } from './fault-injection';
 import { ResponseFacts } from './response-facts';
 import { RingBuffer } from './ring-buffer';
 
@@ -32,6 +33,10 @@ export interface RequestStart {
   readonly endpoint: string;
   /** The search query (`q`), decoded. */
   readonly query: string | null;
+  /** A failure faked by a Break it switch instead of sending the request. */
+  readonly injected: FaultPlan['failure'];
+  /** Time a Break it switch held the request before it was sent or failed. */
+  readonly injectedDelayMs: number;
 }
 
 /** A request the app answered from its own cache, without asking CORE. */
@@ -52,6 +57,8 @@ export interface RequestLogEntry extends Omit<ResponseFacts, 'status'> {
   readonly method: string;
   readonly endpoint: string;
   readonly query: string | null;
+  readonly injected: FaultPlan['failure'];
+  readonly injectedDelayMs: number;
   /** Wall-clock time the attempt started, for display. */
   readonly startedAt: number;
   /** Monotonic time it started, for durations. */
@@ -152,6 +159,8 @@ export class RequestLog {
       source: 'memory',
       trace: null,
       attempt: 0,
+      injected: null,
+      injectedDelayMs: 0,
       startedAt: Date.now(),
       startTime: this.now(),
       durationMs: 0,

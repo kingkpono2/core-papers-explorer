@@ -117,6 +117,9 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  // Keeps anything scrolled into view, such as the results heading when it takes focus, clear of
+  // the fault injection banner while that sticks to the top.
+  scroll-padding-top: var(--fault-banner-offset, 0px);
 }
 
 body {

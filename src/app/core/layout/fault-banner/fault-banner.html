@@ -1,0 +1,22 @@
+@if (faults.active()) {
+  <section #banner class="fault-banner" aria-label="Fault injection">
+    <div class="container fault-banner__inner">
+      <svg class="fault-banner__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 3.5 2.5 20h19L12 3.5Z" />
+        <path d="M12 10v4.5M12 17.25v.25" />
+      </svg>
+      <p class="fault-banner__text">
+        <strong>Fault injection on</strong> — requests are being sabotaged
+        <span class="fault-banner__modes">({{ names() }})</span>
+      </p>
+      <button
+        type="button"
+        class="button button--secondary button--small fault-banner__off"
+        aria-label="Turn off fault injection"
+        (click)="turnOff()"
+      >
+        Turn off
+      </button>
+    </div>
+  </section>
+}

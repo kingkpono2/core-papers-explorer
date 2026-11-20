@@ -26,6 +26,8 @@ describe('RequestLog', () => {
       method: 'GET',
       endpoint: '/search/works/',
       query: 'drone',
+      injected: null,
+      injectedDelayMs: 0,
       ...overrides,
     });
   const entry = (id: number) => log.entries().find((e) => e.id === id)!;

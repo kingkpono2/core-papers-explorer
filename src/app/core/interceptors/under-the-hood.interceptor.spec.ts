@@ -2,9 +2,12 @@ import { HttpClient, HttpRequest, provideHttpClient, withInterceptors } from '@a
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { ApiError } from '../api/api-error';
 import { CORE_API_CONFIG, CoreApiConfig } from '../api/core-api.config';
 import { CoreApiService } from '../api/core-api.service';
+import { FaultInjection } from '../diagnostics/fault-injection';
 import { MONOTONIC_NOW, RequestLog, RequestLogEntry } from '../diagnostics/request-log';
+import { SearchResult } from '../models/paper';
 import { CoreSearchResponse } from '../models/core-api.models';
 import { apiKeyInterceptor } from './api-key.interceptor';
 import { underTheHoodInterceptor } from './under-the-hood.interceptor';
@@ -295,6 +298,148 @@ describe('underTheHoodInterceptor', () => {
 
       http.expectNone(isSearch);
       expect(recorded().map((entry) => entry.followUp)).toEqual([{ type: 'cancelled' }]);
+    });
+  });
+  describe('Break it switches', () => {
+    let faults: FaultInjection;
+    let result: SearchResult | undefined;
+    let error: ApiError | undefined;
+
+    const searchAndWatch = (query = 'drone') =>
+      api.searchWorks({ query, limit: 10 }).subscribe({
+        next: (value) => (result = value),
+        error: (err: ApiError) => (error = err),
+      });
+
+    beforeEach(() => {
+      configure();
+      faults = TestBed.inject(FaultInjection);
+      result = undefined;
+      error = undefined;
+    });
+
+    it('fails every attempt as a network failure when offline, without sending it', () => {
+      faults.set('offline', true);
+      searchAndWatch();
+
+      for (const delayMs of [1_000, 2_000, 4_000]) {
+        http.expectNone(isSearch);
+        jasmine.clock().tick(delayMs);
+      }
+
+      http.expectNone(isSearch);
+      expect(error?.kind).toBe('network');
+      expect(recorded().map((entry) => [entry.attempt, entry.status, entry.injected])).toEqual([
+        [1, 0, 'offline'],
+        [2, 0, 'offline'],
+        [3, 0, 'offline'],
+        [4, 0, 'offline'],
+      ]);
+    });
+
+    it("answers the first two attempts with CORE's 429 and waits as it asks, then sends", () => {
+      faults.set('rate-limit', true);
+      searchAndWatch();
+
+      http.expectNone(isSearch);
+      jasmine.clock().tick(2_999);
+      http.expectNone(isSearch);
+      jasmine.clock().tick(1);
+      http.expectNone(isSearch);
+      jasmine.clock().tick(3_000);
+      http.expectOne(isSearch).flush(okResponse);
+
+      expect(result?.total).toBe(0);
+      const [first, second, third] = recorded();
+      for (const faked of [first, second]) {
+        expect(faked).toEqual(
+          jasmine.objectContaining({
+            status: 429,
+            errorKind: 'rate-limit',
+            injected: 'rate-limit',
+            // The wait comes from the X-RateLimit-Retry-After header on the faked 429.
+            followUp: { type: 'retry', delayMs: 3_000, reason: 'retry-after' },
+          }),
+        );
+      }
+      expect(third).toEqual(
+        jasmine.objectContaining({ attempt: 3, status: 200, injected: null, trace: first.trace }),
+      );
+    });
+
+    it('holds each attempt for 5 s when slow, then sends it', () => {
+      faults.set('slow', true);
+      searchAndWatch();
+
+      jasmine.clock().tick(4_999);
+      http.expectNone(isSearch);
+      jasmine.clock().tick(1);
+      const req = http.expectOne(isSearch);
+      jasmine.clock().tick(250);
+      req.flush(okResponse);
+
+      expect(result?.total).toBe(0);
+      expect(recorded()).toEqual([
+        jasmine.objectContaining({
+          outcome: 'ok',
+          injected: null,
+          injectedDelayMs: 5_000,
+          durationMs: 5_250,
+        }),
+      ]);
+    });
+
+    it("answers with CORE's 500 for a rejected query, which is not retried", () => {
+      faults.set('rejected', true);
+      searchAndWatch();
+      jasmine.clock().tick(10_000);
+
+      http.expectNone(isSearch);
+      expect(error?.kind).toBe('bad-query');
+      expect(recorded()).toEqual([
+        jasmine.objectContaining({
+          status: 500,
+          errorKind: 'bad-query',
+          injected: 'rejected',
+          followUp: { type: 'give-up', reason: 'permanent' },
+        }),
+      ]);
+    });
+
+    it('answers every attempt with a 503 when CORE is unavailable, which is retried', () => {
+      faults.set('unavailable', true);
+      searchAndWatch();
+      jasmine.clock().tick(1_000 + 2_000 + 4_000);
+
+      http.expectNone(isSearch);
+      expect(error?.kind).toBe('server');
+      expect(error?.status).toBe(503);
+      expect(recorded().map((entry) => entry.followUp?.type)).toEqual([
+        'retry',
+        'retry',
+        'retry',
+        'give-up',
+      ]);
+    });
+
+    it('stops sabotaging as soon as the switch is turned off', () => {
+      faults.set('offline', true);
+      searchAndWatch();
+      faults.turnOff();
+      jasmine.clock().tick(1_000);
+
+      http.expectOne(isSearch).flush(okResponse);
+
+      expect(result?.total).toBe(0);
+      expect(recorded().map((entry) => entry.injected)).toEqual(['offline', null]);
+    });
+
+    it('never touches requests outside the CORE API', () => {
+      faults.set('offline', true);
+      TestBed.inject(HttpClient).get('/assets/data.json').subscribe();
+
+      http.expectOne('/assets/data.json').flush({});
+      expect(log.entries()).toEqual([]);
     });
   });
 });
