@@ -1,0 +1,162 @@
+:host {
+  display: block;
+}
+
+.panel {
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.toggle,
+.link {
+  padding: 0;
+  font-size: var(--text-sm);
+  color: var(--color-primary);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-primary-hover);
+  }
+}
+
+.toggle {
+  min-height: 2rem;
+
+  &[aria-pressed='true'] {
+    font-weight: 600;
+  }
+}
+
+.caption,
+.message {
+  margin: var(--space-1) 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.message {
+  margin: var(--space-3) 0 0;
+}
+
+.frame,
+.skeleton {
+  height: 170px;
+  margin-top: var(--space-4);
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.frame {
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 41px,
+    var(--color-border) 41px 42px
+  );
+}
+
+.skeleton {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding-inline: var(--space-2);
+}
+
+.skeleton__bar {
+  flex: 1;
+  border-radius: 4px 4px 0 0;
+  background: var(--color-skeleton);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+
+  .message {
+    margin: 0;
+    color: var(--color-danger);
+  }
+}
+
+.table-wrap {
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+
+  th,
+  td {
+    padding: var(--space-1) var(--space-2);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--color-surface);
+  }
+
+  th {
+    font-weight: 600;
+    text-align: left;
+  }
+
+  td {
+    text-align: right;
+  }
+
+  thead th:last-child {
+    text-align: right;
+  }
+}
+
+.notes {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+
+  li + li {
+    margin-top: var(--space-1);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton__bar {
+    animation: none;
+  }
+}

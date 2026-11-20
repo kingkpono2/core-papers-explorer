@@ -8,6 +8,7 @@ import {
   computed,
   effect,
   inject,
+  linkedSignal,
   untracked,
   viewChild,
 } from '@angular/core';
@@ -22,6 +23,7 @@ import { ErrorState } from '../../../shared/ui/error-state/error-state';
 import { Pagination } from '../../../shared/ui/pagination/pagination';
 import { PaperCard } from '../../../shared/ui/paper-card/paper-card';
 import { SkeletonCard } from '../../../shared/ui/skeleton-card/skeleton-card';
+import { ChartSearch, YearChart } from '../chart/year-chart/year-chart';
 import { PageSizePreference } from '../page-size-preference';
 import { MAX_RESULTS, lastPage, pageOffset, resultRange } from '../paging';
 import { toCoreQuery } from '../query/core-query';
@@ -58,6 +60,7 @@ const SKELETON_COUNT = 3;
     RouterLink,
     SearchBar,
     SkeletonCard,
+    YearChart,
   ],
   templateUrl: './search-page.html',
   styleUrl: './search-page.scss',
@@ -107,6 +110,32 @@ export class SearchPage {
     ),
     { initialValue: { status: 'idle' } },
   );
+
+  /**
+   * What the chart describes. It follows the query, not the page, so paging keeps the chart as it
+   * is, and it is only settled once the results are in, so the chart asks CORE after them.
+   */
+  protected readonly chartSearch = linkedSignal<SearchState, ChartSearch | null>({
+    source: this.state,
+    computation: (state, previous) => {
+      if (state.status === 'idle' || state.status === 'invalid') {
+        return null;
+      }
+      const query = toCoreQuery(state.params.query);
+      const kept = previous?.value?.query === query ? previous.value : null;
+      switch (state.status) {
+        case 'loading':
+          return kept ?? { query, total: null, settled: false };
+        case 'error':
+          return kept ?? { query, total: null, settled: true };
+        case 'success':
+          return { query, total: state.result.total, settled: true };
+      }
+    },
+    equal: (a, b) =>
+      a === b ||
+      (!!a && !!b && a.query === b.query && a.total === b.total && a.settled === b.settled),
+  });
 
   /** Words from the query that was searched, to mark in titles and abstracts. */
   protected readonly highlightTerms = computed(() => {

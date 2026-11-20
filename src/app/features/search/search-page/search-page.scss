@@ -45,8 +45,36 @@ select {
   }
 }
 
-.results {
-  margin-top: var(--space-8);
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+
+// Beside the results on wide screens, where it stays in view while scrolling; above them otherwise.
+@media (min-width: 64rem) {
+  :host {
+    max-width: none;
+  }
+
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    align-items: start;
+    gap: var(--space-8);
+  }
+
+  .chart {
+    position: sticky;
+    top: var(--space-4);
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .results {
+    grid-column: 1;
+    grid-row: 1;
+  }
 }
 
 .results__header {

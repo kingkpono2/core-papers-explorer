@@ -7,7 +7,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { Subject } from 'rxjs';
 import { ApiError } from '../../../core/api/api-error';
 import { CoreApiService } from '../../../core/api/core-api.service';
-import { Paper, SearchResult } from '../../../core/models/paper';
+import { Paper, SearchResult, YearCounts } from '../../../core/models/paper';
 import { makePaper } from '../../../../testing/paper.fixture';
 import { PAGE_SIZE_STORAGE_KEY } from '../page-size-preference';
 import { RECENT_SEARCHES_STORAGE_KEY, RecentSearches } from '../recent-searches';
@@ -30,6 +30,8 @@ describe('SearchPage', () => {
   let el: HTMLElement;
   let responses: Subject<SearchResult>[];
   let searchWorks: jasmine.Spy;
+  let yearResponses: Subject<YearCounts>[];
+  let countByYear: jasmine.Spy;
 
   const stable = () => harness.fixture.whenStable();
   const url = () => TestBed.inject(Router).url;
@@ -94,13 +96,19 @@ describe('SearchPage', () => {
       responses.push(response);
       return response;
     });
+    yearResponses = [];
+    countByYear = jasmine.createSpy('countByYear').and.callFake(() => {
+      const response = new Subject<YearCounts>();
+      yearResponses.push(response);
+      return response;
+    });
 
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
         provideRouter([{ path: '', component: SearchPage }]),
         provideLocationMocks(),
-        { provide: CoreApiService, useValue: { searchWorks } },
+        { provide: CoreApiService, useValue: { searchWorks, countByYear } },
       ],
     });
   });
@@ -432,6 +440,82 @@ describe('SearchPage', () => {
 
       expect(url()).toBe('/?q=drone&size=10&page=3');
       expect(lastRequest()).toEqual({ query: 'drone', limit: 10, offset: 20 });
+    });
+  });
+
+  describe('chart', () => {
+    const years: YearCounts = {
+      counts: [
+        { year: 2020, count: 354 },
+        { year: 2026, count: 655 },
+      ],
+      truncated: false,
+    };
+    const respondYears = async () => {
+      yearResponses.at(-1)!.next(years);
+      await stable();
+      await new Promise(requestAnimationFrame);
+      await stable();
+    };
+
+    it('is blank before a search', async () => {
+      await open();
+
+      expect(el.querySelector('app-year-chart')?.textContent).toContain('Search to see when');
+      expect(countByYear).not.toHaveBeenCalled();
+    });
+
+    it('asks CORE for year counts after the results, with the query as sent to CORE', async () => {
+      await open('/?q=(drone AND (package OR delivery))');
+      expect(countByYear).not.toHaveBeenCalled();
+
+      await respond(resultOf(4_729, papers(10)));
+
+      expect(countByYear).toHaveBeenCalledOnceWith('drone AND (package OR delivery)');
+    });
+
+    it('keeps the chart when only the page or page size changes', async () => {
+      await open('/?q=drone');
+      await respond(resultOf(71_213, papers(10)));
+      await respondYears();
+
+      pageLink('Next').click();
+      await stable();
+      expect(el.querySelector('app-bar-chart')).not.toBeNull();
+      await respond(resultOf(71_213, papers(10, 10), 10));
+      await selectPageSize('25');
+      await respond(resultOf(71_213, papers(25)));
+
+      expect(searchWorks).toHaveBeenCalledTimes(3);
+      expect(countByYear).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks again for a new query and drops the old request', async () => {
+      await open('/?q=drone');
+      await respond(resultOf(71_213, papers(10)));
+      await submit('robots');
+
+      expect(yearResponses[0].observed).toBeFalse();
+      await respond(resultOf(500, papers(10)));
+      expect(countByYear.calls.mostRecent().args).toEqual(['robots']);
+    });
+
+    it('searches the chosen year when a bar is selected', async () => {
+      await open('/?q=(drone AND (package OR delivery))');
+      await respond(resultOf(4_729, papers(10)));
+      await respondYears();
+
+      const bar = [...el.querySelectorAll<SVGRectElement>('app-bar-chart rect.hit')].find((hit) =>
+        hit.getAttribute('aria-label')?.startsWith('2020'),
+      )!;
+      bar.dispatchEvent(new MouseEvent('click'));
+      await stable();
+
+      expect(lastRequest()).toEqual({
+        query: 'drone AND (package OR delivery) AND yearPublished:2020',
+        limit: 10,
+        offset: 0,
+      });
     });
   });
 });
